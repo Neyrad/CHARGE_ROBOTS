@@ -8,6 +8,15 @@
 #include "ross.h"
 #include "model.h"
 
+
+
+
+const char* path_to_log_folder   = "/mnt/c/Dev/Base/pygame/Simulation_History";
+const char* path_to_input_folder = "box.csv";
+
+
+
+
 // Define LP types
 //   these are the functions called by ROSS for each LP
 //   multiple sets can be defined (for multiple LP types)
@@ -35,11 +44,6 @@ const tw_optdef model_opts[] = {
     TWOPT_END(),
 };
 
-
-//const char* path_to_log_folder   = "/mnt/c/Dev/Base/pygame/Simulation_History";
-const char* path_to_log_folder   = "../pygame/Simulation_History";
-//const char* path_to_input_folder = "box.csv";
-const char* path_to_input_folder = "../csv/box.csv";
 
 extern int glb_time;
 
