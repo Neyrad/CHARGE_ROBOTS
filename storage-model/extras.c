@@ -14,12 +14,27 @@ void PrintMap(const char* log_folder_path)
     FILE* f = fopen(path, "w");
     for (int y = 0; y < storage.height; ++y) {
         for (int x = 0; x < storage.length; ++x) {
-            fprintf(f, "%d", storage.data[y][x]);
-            if (x < storage.length - 1) fprintf(f, ","); //no comma at the end of a line
+            fprintf(f, "%d", storage.robots[y][x]);
+            if (x < storage.length - 1)
+				fprintf(f, ","); //no comma at the end of a line
         }
         fprintf(f, "\n");
     }
     fclose(f);
+}
+
+void PrintPairs()
+{
+	for (int y = 0; y < pairs.length; ++y)
+	{
+        for (int x = 0; x < 2; ++x)
+		{
+            printf("%d", pairs.data[y][x]);
+            if (x == 0)
+				printf(","); //no comma at the end of a line
+        }
+        printf("\n");
+    }
 }
 
 void PrintNSteps(const char* log_folder_path)
@@ -32,13 +47,13 @@ void PrintNSteps(const char* log_folder_path)
 }
 
 //Converts a CSV file to a 2D int array
-void parse(const char* path)
+void Parse(const char* path, int arr[MAX_ROOM_HEIGHT][MAX_ROOM_LENGTH])
 {
     struct stat stats;
     stat(path, &stats);
     FILE* f = fopen(path, "r");
-    assert(f); //to check if the path is correct
-    char buf[MAX_ROOM_HEIGHT * MAX_ROOM_LENGTH * 2 + MAX_COMMENT_LENGTH]; // * 2 because of commas
+    assert(f); //to check correctness of the path
+    char buf[MAX_ROOM_HEIGHT * MAX_ROOM_LENGTH * 2 + MAX_COMMENT_LENGTH]; // * 2 for commas
     fread(buf, sizeof(buf[0]), stats.st_size, f);
     fclose(f);
 
@@ -59,16 +74,46 @@ void parse(const char* path)
             continue;
         }
         if (isdigit(buf[i])) {
-            if ((i < stats.st_size) && isdigit(buf[i+1])) {
-                storage.data[storage.height][x] = (buf[i] - '0') * 10 + (buf[i+1] - '0');
+            if ((i < stats.st_size) && isdigit(buf[i+1])) {  //processing 2-digit numbers
+                arr[storage.height][x] = (buf[i] - '0') * 10 + (buf[i+1] - '0');
                 ++i;
             }
             else {
-                storage.data[storage.height][x] = buf[i] - '0';
+                arr[storage.height][x] = buf[i] - '0';
             }
             ++x;
         }
     }
+}
+
+void ParsePairs(const char* path)
+{
+    struct stat stats;
+    stat(path, &stats);
+    FILE* f = fopen(path, "r");
+    assert(f); //to check correctness of the path
+    char buf[MAX_INPUT_LENGTH * 4]; //'1' ',' '2' '\n' -> 4 columns
+    fread(buf, sizeof(buf[0]), stats.st_size, f);
+    fclose(f);
+
+	pairs.length = 0;
+    int x = 0;
+    for (int i = 0; i < stats.st_size; ++i)
+	{
+        if (buf[i] == '\n')
+		{
+            ++pairs.length;
+            x = 0;
+            continue;
+        }
+        if (isdigit(buf[i]))
+		{
+            pairs.data[pairs.length][x] = buf[i] - '0';
+            ++x;
+        }
+    }
+	pairs.cur = 0;
+	pairs.eof = FALSE;
 }
 
 void RobotsInit()
@@ -76,31 +121,26 @@ void RobotsInit()
     Robots.N = 0;
     for (int y = 0; y < storage.height; ++y)
         for (int x = 0; x < storage.length; ++x)
-            if (storage.data[y][x] == CELL_ROBOT_UP    || \
-                storage.data[y][x] == CELL_ROBOT_DOWN  || \
-                storage.data[y][x] == CELL_ROBOT_LEFT  || \
-                storage.data[y][x] == CELL_ROBOT_RIGHT    ) {
-                
+            if (storage.robots[y][x] == CELL_ROBOT_VER   		|| \
+                storage.robots[y][x] == CELL_ROBOT_HOR   		|| \
+				storage.robots[y][x] == CELL_ROBOT_WITH_BOX_VER || \
+                storage.robots[y][x] == CELL_ROBOT_WITH_BOX_HOR) 
+			{
+				if (storage.robots[y][x] == CELL_ROBOT_VER || \
+					storage.robots[y][x] == CELL_ROBOT_HOR)
+					Robots.data[Robots.N].carries_box = FALSE;
+				else
+					Robots.data[Robots.N].carries_box = TRUE;
+				
                 Robots.data[Robots.N].x = x;
                 Robots.data[Robots.N].y = y;
-
-                Robots.data[Robots.N].carries_box = FALSE;
                 
-                switch(storage.data[y][x])
-                {
-                    case CELL_ROBOT_UP:
-                        Robots.data[Robots.N].direction = UP;
-                        break;
-                    case CELL_ROBOT_DOWN:
-                        Robots.data[Robots.N].direction = DOWN;
-                        break;
-                    case CELL_ROBOT_LEFT:
-                        Robots.data[Robots.N].direction = LEFT;
-                        break;
-                    case CELL_ROBOT_RIGHT:
-                        Robots.data[Robots.N].direction = RIGHT;
-                        break;
-                }
+                if (storage.robots[y][x] == CELL_ROBOT_VER || \
+				    storage.robots[y][x] == CELL_ROBOT_WITH_BOX_VER)
+				    Robots.data[Robots.N].orientation = VER;
+				else
+					Robots.data[Robots.N].orientation = HOR;
+
                 ++Robots.N;
                 assert(Robots.N <= MAX_ROBOTS);
             }
@@ -108,25 +148,14 @@ void RobotsInit()
 
 void RobotsPrint()
 {
-    for (int i = 0; i < Robots.N; ++i) {
-        printf("Robot #%d is located at (%d, %d) and is facing ", \
+    for (int i = 0; i < Robots.N; ++i)
+	{
+        printf("Robot #%d is located at (%d, %d) ", \
                       i+1, Robots.data[i].x, Robots.data[i].y);
-        
-        switch(Robots.data[i].direction)
-        {
-            case UP:
-                printf("UP\n");
-                break;
-            case DOWN:
-                printf("DOWN\n");
-                break;
-            case LEFT:
-                printf("LEFT\n");
-                break;
-            case RIGHT:
-                printf("RIGHT\n");
-                break;
-        } 
+        if (Robots.data[i].orientation == VER)
+			printf("VER\n");
+		else
+			printf("HOR\n");
     }
 }
 
@@ -158,20 +187,28 @@ void AssignDest(struct _robot* robot, int goal)
 {
 	if      (goal == CELL_BOX)
 	{
-		switch(rand() % 2)
+		GetPair(robot);
+		switch(robot->pair[0]) //instead of random choice read BOX -> CONTAINER pair from the log file
 		{
-			case 0:
-				{
-				struct cell dest_cell = {3, 2, CELL_BOX}; // {x, y, value}
-				robot->dest = dest_cell;
-				robot->dest_dir = UP;
-				}
-				return;
 			case 1:
 				{
-				struct cell dest_cell = {7, 2, CELL_BOX};
+				struct cell dest_cell = {2, 7, CELL_BOX}; // {x, y, value}
 				robot->dest = dest_cell;
-				robot->dest_dir = UP;
+				robot->dest_ori = VER;
+				}
+				return;
+			case 2:
+				{
+				struct cell dest_cell = {4, 7, CELL_BOX};
+				robot->dest = dest_cell;
+				robot->dest_ori = VER;
+				}
+				return;
+			case 3:
+				{
+				struct cell dest_cell = {6, 7, CELL_BOX};
+				robot->dest = dest_cell;
+				robot->dest_ori = VER;
 				}
 				return;
 			default:
@@ -181,27 +218,69 @@ void AssignDest(struct _robot* robot, int goal)
 	}
 	else if (goal == CELL_CONTAINER)
 	{
-		switch(rand() % 3)
+		switch(robot->pair[1]) //should already know based on the box number (box - contatiner pair from the log file)
 		{
-			case 0:
-				{
-				struct cell dest_cell = {2, 7, CELL_CONTAINER};
-				robot->dest = dest_cell;
-				robot->dest_dir = DOWN;
-				}
-				return;
 			case 1:
 				{
-				struct cell dest_cell = {5, 7, CELL_CONTAINER};
+				struct cell dest_cell = {0, 6, CELL_CONTAINER};
 				robot->dest = dest_cell;
-				robot->dest_dir = DOWN;
+				robot->dest_ori = HOR;
 				}
 				return;
 			case 2:
 				{
-				struct cell dest_cell = {8, 7, CELL_CONTAINER};
+				struct cell dest_cell = {0, 4, CELL_CONTAINER};
 				robot->dest = dest_cell;
-				robot->dest_dir = DOWN;
+				robot->dest_ori = HOR;
+				}
+				return;
+			case 3:
+				{
+				struct cell dest_cell = {0, 2, CELL_CONTAINER};
+				robot->dest = dest_cell;
+				robot->dest_ori = HOR;
+				}
+				return;
+			case 4:
+				{
+				struct cell dest_cell = {2, 0, CELL_CONTAINER};
+				robot->dest = dest_cell;
+				robot->dest_ori = VER;
+				}
+				return;
+			case 5:
+				{
+				struct cell dest_cell = {4, 0, CELL_CONTAINER};
+				robot->dest = dest_cell;
+				robot->dest_ori = VER;
+				}
+				return;
+			case 6:
+				{
+				struct cell dest_cell = {6, 0, CELL_CONTAINER};
+				robot->dest = dest_cell;
+				robot->dest_ori = VER;
+				}
+				return;
+			case 7:
+				{
+				struct cell dest_cell = {8, 6, CELL_CONTAINER};
+				robot->dest = dest_cell;
+				robot->dest_ori = HOR;
+				}
+				return;
+			case 8:
+				{
+				struct cell dest_cell = {8, 4, CELL_CONTAINER};
+				robot->dest = dest_cell;
+				robot->dest_ori = HOR;
+				}
+				return;
+			case 9:
+				{
+				struct cell dest_cell = {8, 2, CELL_CONTAINER};
+				robot->dest = dest_cell;
+				robot->dest_ori = HOR;
 				}
 				return;
 			default:
@@ -209,149 +288,158 @@ void AssignDest(struct _robot* robot, int goal)
 				return;
 		}
 	}
+	
+	else if (goal == CELL_CHARGER)
+	{
+		//choose the closest free charger
+		if (robot->y == 0)
+		{
+			struct cell dest_cell = {8, 0, CELL_CHARGER};
+			robot->dest = dest_cell;
+			robot->dest_ori = VER;
+		}	
+		else
+		{
+			struct cell dest_cell = {0, 0, CELL_CHARGER};
+			robot->dest = dest_cell;
+			robot->dest_ori = VER;
+		}
+	}
 }
 
+/*
 int CalcNextMove(struct _robot* robot)
 {
-	
-	if (robot->stuck && NeighborAlsoStuck(robot))
-		return unstuck(robot);
-	
-	if (robot->unstucking)
-	{
-		robot->unstucking = FALSE;
-		return MOVE;
-	}
-	
-	//firstly y
-	int dist_Y = robot->dest.y - robot->y;
-	dir desired = dist_Y > 0 ? DOWN : dist_Y < 0 ? UP : NONE;
-	
-	//then x
 	int dist_X = robot->dest.x - robot->x;
-	if (desired == NONE) //y is ok
-		desired = dist_X > 0 ? RIGHT : dist_X < 0 ? LEFT : NONE;
+	int dist_Y = robot->dest.y - robot->y;
+	
+	if (dist_Y != 0)
+	{
+		if (robot->orientation == HOR)
+			return ROTATE;
 		
-	
-	if (desired == NONE) //already in the destination
-	{
-		if (robot->direction == robot->dest_dir)
-			return robot->dest.value == CELL_BOX ? BOX_GRAB : BOX_DROP;
-		return Rotate(robot->direction, robot->dest_dir);
+		if (dist_Y > 0)
+			return MOVE_D;
+		else
+			return MOVE_U;
 	}
 	
-	if (robot->direction != desired)
-		return Rotate(robot->direction, desired);
+	if (dist_X != 0)
+	{
+		if (robot->orientation == VER)
+			return ROTATE;
+		
+		if (dist_X > 0)
+			return MOVE_R;
+		else
+			return MOVE_L;
+	}
 	
-	return MOVE;
+	if (robot->orientation != robot->dest_ori)
+		return ROTATE;
+	
+	return robot->dest.value == CELL_BOX ? BOX_GRAB : BOX_DROP;
 }
+*/
 
-int Rotate(int cur, int des)
+int CalcNextMove2(struct _robot* robot) //running in circles
 {
-	switch (cur)
+	if (robot->charging)
 	{
-		case UP:
-			if      (des == UP)    return NONE;
-			else if (des == DOWN)  return ROTATE_LEFT;
-			else if (des == RIGHT) return ROTATE_RIGHT;
-			else if (des == LEFT)  return ROTATE_LEFT;
-			else printf("Rotate(): Unrecognized desired direction\n");
-			break;
-		case DOWN:
-			if      (des == UP)    return ROTATE_LEFT;
-			else if (des == DOWN)  return NONE;
-			else if (des == RIGHT) return ROTATE_LEFT;
-			else if (des == LEFT)  return ROTATE_RIGHT;
-			else printf("Rotate(): Unrecognized desired direction\n");
-			break;
-		case RIGHT:
-			if      (des == UP)    return ROTATE_LEFT;
-			else if (des == DOWN)  return ROTATE_RIGHT;
-			else if (des == RIGHT) return NONE;
-			else if (des == LEFT)  return ROTATE_LEFT;
-			else printf("Rotate(): Unrecognized desired direction\n");
-			break;
-		case LEFT:
-			if      (des == UP)    return ROTATE_RIGHT;
-			else if (des == DOWN)  return ROTATE_LEFT;
-			else if (des == RIGHT) return ROTATE_LEFT;
-			else if (des == LEFT)  return NONE;
-			else printf("Rotate(): Unrecognized desired direction\n");
-			break;
-		default:
-			printf("Rotate(): Unrecognized current direction\n");
-			return NONE;
-	}
-}
-
-int unstuck(struct _robot* me)
-{
-	me->stuck      = FALSE;
-	me->unstucking = TRUE;
-	
-	struct cell up	  = {me->x  , me->y-1, storage.data[me->y-1][me->x  ]};
-	struct cell down  = {me->x  , me->y+1, storage.data[me->y+1][me->x  ]};
-	struct cell left  = {me->x-1, me->y  , storage.data[me->y  ][me->x-1]};
-	struct cell right = {me->x+1, me->y  , storage.data[me->y  ][me->x+1]};
-	
-	struct cell rel_left;
-	struct cell rel_right;
-	
-	switch(me->direction)
-	{
-		case UP:
-			rel_left  = left;
-			rel_right = right;
-			break;
-		case DOWN:
-			rel_left  = right;
-			rel_right = left;
-			break;
-		case LEFT:
-			rel_left  = down;
-			rel_right = up;
-			break;
-		case RIGHT:
-			rel_left  = up;
-			rel_right = down;
-			break;
+		if (robot->battery < robot->capacity)
+		{
+			robot->battery += CHARGE_CHUNK;
+			return NOP;
+		}
+		
+		else //fully charged
+		{
+			if 		(robot->x == 0)  //left charger
+			{
+				if (robot->orientation == HOR)
+				{
+					robot->capacity -= CAPACITY_CHUNK;
+					robot->battery  = robot->capacity;
+					robot->charging = FALSE;
+					AssignDest(robot, CELL_BOX);
+					return MOVE_R;
+				}
+				else
+					return ROTATE;
+			}	
+				
+			else if (robot->x == 8)	//right charger
+			{
+				if (robot->orientation == VER)
+				{
+					robot->capacity -= CAPACITY_CHUNK;
+					robot->battery  = BATTERY_CAPACITY;
+					robot->charging = FALSE;
+					AssignDest(robot, CELL_BOX);
+					return MOVE_D;
+				}
+				else
+					return ROTATE;
+			}	
+		}
 	}
 	
-	if      (rel_left.value  == CELL_EMPTY)
-		return ROTATE_LEFT;
-	else if (rel_right.value == CELL_EMPTY)
-		return ROTATE_RIGHT;
-
-	me->stuck      = TRUE;
-	me->unstucking = FALSE;
+	if (robot->dest.x == robot->x && robot->dest.y == robot->y)
+	{
+		if (robot->orientation == robot->dest_ori)
+		{
+			switch(robot->dest.value)
+			{
+				case CELL_BOX:
+					return BOX_GRAB;
+				case CELL_CONTAINER:
+					return BOX_DROP;
+				case CELL_CHARGER:
+					robot->charging = TRUE;
+					return NOP;
+			}
+		}
+		
+		else
+			return ROTATE;
+	}
+	
+	if (robot->y == 0 && robot->x != 8)
+		if (robot->x == 7 && robot->dest.value != CELL_CHARGER)
+			return robot->orientation == VER ? MOVE_D : ROTATE;
+		else
+			return robot->orientation == HOR ? MOVE_R : ROTATE;
+		
+	if (robot->y == 7 && robot->x != 0)
+		return robot->orientation == HOR ? MOVE_L : ROTATE;
+	
+	if (robot->x == 0 && robot->y != 0)
+		if (robot->y == 1 && robot->dest.value != CELL_CHARGER)
+			return robot->orientation == HOR ? MOVE_R : ROTATE;
+		else
+			return robot->orientation == VER ? MOVE_U : ROTATE;
+	
+	if (robot->x == 8 && robot->y != 7)
+		return robot->orientation == VER ? MOVE_D : ROTATE;
+	
+	if (robot->x == 1 && robot->y == 1)
+		return robot->orientation == VER ? MOVE_U : ROTATE;
+	
+	if (robot->x == 7 && robot->y == 1)
+		return robot->orientation == HOR ? MOVE_R : ROTATE;
+	
 	return NOP;
 }
 
-bool NeighborAlsoStuck(struct _robot* This)
-{
-	struct cell NeigbourCoords;
-	switch(This->direction)
-    {
-        case UP:
-            NeigbourCoords.x     = This->x    ;
-            NeigbourCoords.y     = This->y - 1;
-            break;
-        case DOWN:
-            NeigbourCoords.x     = This->x    ;
-            NeigbourCoords.y     = This->y + 1;
-            break;
-        case LEFT:
-            NeigbourCoords.x     = This->x - 1;
-            NeigbourCoords.y     = This->y    ;
-            break;    
-        case RIGHT:
-            NeigbourCoords.x     = This->x + 1;
-            NeigbourCoords.y     = This->y    ;
-            break;
-    }
-	
-	for (int i = 0; i < Robots.N; ++i)
-		if (Robots.data[i].x == NeigbourCoords.x &&\
-			Robots.data[i].y == NeigbourCoords.y)
-			return Robots.data[i].stuck;
+void GetPair(struct _robot* robot)
+{	
+	if (pairs.cur == pairs.length)
+	{
+		pairs.eof = TRUE;
+		printf("GetPair(): End of LOG file...\n");
+		return;
+	}
+	robot->pair[0] = pairs.data[pairs.cur][0];
+	robot->pair[1] = pairs.data[pairs.cur][1];
+	++pairs.cur;
 }

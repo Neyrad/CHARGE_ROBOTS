@@ -44,10 +44,10 @@ void model_init (state *s, tw_lp *lp)
         s->type = ROBOT;
         assert(lp->gid <= Robots.N);
 		
-		Robots.data[lp->gid - 1].carries_box = FALSE;
-		Robots.data[lp->gid - 1].state       = STOP;
-		Robots.data[lp->gid - 1].stuck       = FALSE;
-		Robots.data[lp->gid - 1].unstucking  = FALSE;
+		Robots.data[lp->gid - 1].state      = STOP;
+		Robots.data[lp->gid - 1].battery    = BATTERY_CAPACITY;
+		Robots.data[lp->gid - 1].capacity   = BATTERY_CAPACITY;
+		Robots.data[lp->gid - 1].charging   = FALSE;
 		AssignDest(&Robots.data[lp->gid - 1], CELL_BOX);
     
         printf("ROBOT #%ld is initialized\n", lp->gid);
@@ -58,15 +58,16 @@ void model_init (state *s, tw_lp *lp)
     // init state data
     s->value = -1;
 
-    s->got_msgs_ROTATE_LEFT          = 0;
-    s->got_msgs_ROTATE_RIGHT         = 0;
-    s->got_msgs_MOVE                 = 0;
-    s->got_msgs_BOX_GRAB             = 0;
-    s->got_msgs_BOX_DROP             = 0;
-    s->got_msgs_RECEIVED             = 0;
-    s->got_msgs_EXECUTED             = 0;
-    s->got_msgs_INIT                 = 0;
-	s->got_msgs_NOP                  = 0;
+    s->got_msgs_ROTATE	 = 0;
+    s->got_msgs_MOVE_U   = 0;
+	s->got_msgs_MOVE_D   = 0;
+	s->got_msgs_MOVE_L   = 0;
+	s->got_msgs_MOVE_R   = 0;
+    s->got_msgs_BOX_GRAB = 0;
+    s->got_msgs_BOX_DROP = 0;
+    s->got_msgs_RECEIVED = 0;
+    s->got_msgs_INIT     = 0;
+	s->got_msgs_NOP      = 0;
 
     if (lp->gid == 0)
 		for (int i = 1; i <= Robots.N; ++i)
@@ -94,9 +95,6 @@ void model_event (state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
                 case RECEIVED:
                     ++s->got_msgs_RECEIVED; 
                     break;
-                case EXECUTED:
-                    ++s->got_msgs_EXECUTED; 
-                    break;
                 case INIT:
                     ++s->got_msgs_INIT; 
                     break;
@@ -104,7 +102,8 @@ void model_event (state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
                     printf("COMMAND CENTER: Unhandled forward message type %d\n", in_msg->type);
             }
 
-            //if (glb_time > 40) return;
+            if (pairs.eof)
+				return;
 
 			RobotResponded[in_msg->sender-1] = TRUE;
 			if (EveryoneResponded(RobotResponded, Robots.N))
@@ -118,292 +117,218 @@ void model_event (state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
 				
 				for (int i = 1; i <= Robots.N; ++i)
 				{
-					message_type cmd = CalcNextMove(&Robots.data[i-1]);
+					message_type cmd = CalcNextMove2(&Robots.data[i-1]);
 					SendMessage(i, lp, glb_time, cmd);
 				}
 			}
-			
-			
-
             break;
 
         case ROBOT:
             {
             struct _robot* This = &Robots.data[self-1];
-            struct cell cell_in_front = {-1, -1, -1};
-            switch (in_msg->type)
+            printf("Robot #%d: battery level is %d/%d\n", self, This->battery, This->capacity);
+			switch (in_msg->type)
             {
-                case ROTATE_LEFT:
-                    ++s->got_msgs_ROTATE_LEFT; 
-                    switch(This->direction)         
-                    {
-                        case UP:
-                            This->direction = LEFT;
-                            storage.data[This->y][This->x] = This->carries_box ? CELL_ROBOT_WITH_BOX_LEFT : CELL_ROBOT_LEFT;
-                            break;
-                        case DOWN:
-                            This->direction = RIGHT;
-                            storage.data[This->y][This->x] = This->carries_box ? CELL_ROBOT_WITH_BOX_RIGHT : CELL_ROBOT_RIGHT;
-                            break;
-                        case LEFT:
-                            This->direction = DOWN;
-                            storage.data[This->y][This->x] = This->carries_box ? CELL_ROBOT_WITH_BOX_DOWN : CELL_ROBOT_DOWN;
-                            break;    
-                        case RIGHT:
-                            This->direction = UP;
-                            storage.data[This->y][This->x] = This->carries_box ? CELL_ROBOT_WITH_BOX_UP : CELL_ROBOT_UP;
-                            break;
-                    }
-                    is_executed = TRUE;
+                case ROTATE:
+                    ++s->got_msgs_ROTATE;
+					if (This->state == MOTION)
+						This->battery -= STOP_MOTION_COST;
+					This->state = STOP;
+					
+					if (This->orientation == VER)
+					{
+						This->orientation = HOR;
+						storage.robots[This->y][This->x] = This->carries_box ? CELL_ROBOT_WITH_BOX_HOR : CELL_ROBOT_HOR;
+					}
+					else
+					{
+						This->orientation = VER;
+						storage.robots[This->y][This->x] = This->carries_box ? CELL_ROBOT_WITH_BOX_VER : CELL_ROBOT_VER;
+					}
+					
+					This->battery -= ROTATE_COST;
                     break;
-                case ROTATE_RIGHT:
-                    ++s->got_msgs_ROTATE_RIGHT;
-                    switch(This->direction)  
-                    {
-                        case UP:
-                            This->direction = RIGHT;
-                            storage.data[This->y][This->x] = This->carries_box ? CELL_ROBOT_WITH_BOX_RIGHT : CELL_ROBOT_RIGHT;
-                            break;
-                        case DOWN:
-                            This->direction = LEFT;
-                            storage.data[This->y][This->x] = This->carries_box ? CELL_ROBOT_WITH_BOX_LEFT : CELL_ROBOT_LEFT;
-                            break;
-                        case LEFT:
-                            This->direction = UP;
-                            storage.data[This->y][This->x] = This->carries_box ? CELL_ROBOT_WITH_BOX_UP : CELL_ROBOT_UP;
-                            break;    
-                        case RIGHT:
-                            This->direction = DOWN;
-                            storage.data[This->y][This->x] = This->carries_box ? CELL_ROBOT_WITH_BOX_DOWN : CELL_ROBOT_DOWN;
-                            break;
-                    }
-                    is_executed = TRUE;
-                    break;
-                case MOVE:
-                    ++s->got_msgs_MOVE;
-                    struct cell dest_cell = {-1, -1, -1};
-                    switch(This->direction)         
-                    {
-                        case UP:
-                            assert(This->y - 1 >= 0); //to stay within the boundaries of the map
-                            dest_cell.x     = This->x    ;
-                            dest_cell.y     = This->y - 1;
-                            break;
-                        case DOWN:
-                            assert(This->y + 1 <= storage.height - 1);
-                            dest_cell.x     = This->x    ;
-                            dest_cell.y     = This->y + 1;
-                            break;
-                        case LEFT:
-                            assert(This->x - 1 >= 0);
-                            dest_cell.x     = This->x - 1;
-                            dest_cell.y     = This->y    ;
-                            break;    
-                        case RIGHT:
-                            assert(This->x + 1 <= storage.length - 1);
-                            dest_cell.x     = This->x + 1;
-                            dest_cell.y     = This->y    ;
-                            break;
-                    }
-
-                    switch(storage.data[dest_cell.y][dest_cell.x])
+                case MOVE_U:
+                    ++s->got_msgs_MOVE_U;
+					assert(This->orientation == VER);
+					assert(This->y - 1 >= 0);
+                    switch(storage.room[This->y - 1][This->x])
                     {
                         case CELL_EMPTY:
-							if (This->stuck)
-								This->stuck = FALSE;
-                            switch(This->direction)  
-                            {
-                                case UP:
-                                    storage.data[dest_cell.y][dest_cell.x] = \
-                                       This->carries_box ? CELL_ROBOT_WITH_BOX_UP : CELL_ROBOT_UP;
-                                    break;
-                                case DOWN:
-                                    storage.data[dest_cell.y][dest_cell.x] = \
-                                       This->carries_box ? CELL_ROBOT_WITH_BOX_DOWN : CELL_ROBOT_DOWN;
-                                    break;
-                                case LEFT:
-                                    storage.data[dest_cell.y][dest_cell.x] = \
-                                       This->carries_box ? CELL_ROBOT_WITH_BOX_LEFT : CELL_ROBOT_LEFT;
-                                    break;    
-                                case RIGHT:
-                                    storage.data[dest_cell.y][dest_cell.x] = \
-                                       This->carries_box ? CELL_ROBOT_WITH_BOX_RIGHT : CELL_ROBOT_RIGHT;
-                                    break;
-                            }
-                            storage.data[This->y][This->x] = CELL_EMPTY;
-                            This->x = dest_cell.x;
-                            This->y = dest_cell.y;
-                            is_executed = TRUE;
+						case CELL_BOX:
+						case CELL_CONTAINER:
+						case CELL_CHARGER:
+							if (storage.robots[This->y - 1][This->x] == CELL_EMPTY)
+							{
+								storage.robots[This->y - 1][This->x] = This->carries_box ? CELL_ROBOT_WITH_BOX_VER : CELL_ROBOT_VER;
+								storage.robots[This->y    ][This->x] = CELL_EMPTY;
+								This->y = This->y - 1;
+								
+								if 		(This->state == MOTION)
+									This->battery -= KEEP_MOTION_COST;
+								else if (This->state == STOP)
+									This->battery -= START_MOTION_COST;
+								
+								This->state = MOTION;
+							}
                             break;
                         case CELL_WALL:
-							break;
-						case CELL_BOX:
-                            break;
-                        case CELL_CONTAINER:
-                            break;
-                        case CELL_ROBOT_WITH_BOX_UP:
-							if (This->direction == DOWN)
-								This->stuck = TRUE;
-							break;
-                        case CELL_ROBOT_WITH_BOX_DOWN:
-							if (This->direction == UP)
-								This->stuck = TRUE;
-							break;
-                        case CELL_ROBOT_WITH_BOX_LEFT:
-                            if (This->direction == RIGHT)
-								This->stuck = TRUE;
-							break;
-                        case CELL_ROBOT_WITH_BOX_RIGHT:
-                            if (This->direction == LEFT)
-								This->stuck = TRUE;
-							break;
-                        case CELL_ROBOT_UP:
-                            if (This->direction == DOWN)
-								This->stuck = TRUE;
-							break;
-                        case CELL_ROBOT_DOWN:
-                            if (This->direction == UP)
-								This->stuck = TRUE;
-							break;
-                        case CELL_ROBOT_LEFT:
-                            if (This->direction == RIGHT)
-								This->stuck = TRUE;
-							break;
-                        case CELL_ROBOT_RIGHT:
-                            if (This->direction == LEFT)
-								This->stuck = TRUE;
+							This->state = STOP;
 							break;
                         default:
                             break;
                     }
-
+                    break;
+				case MOVE_D:
+                    ++s->got_msgs_MOVE_D;
+					assert(This->orientation == VER);
+					assert(This->y + 1 < storage.height);
+                    switch(storage.room[This->y + 1][This->x])
+                    {
+                        case CELL_EMPTY:
+						case CELL_BOX:
+						case CELL_CONTAINER:
+						case CELL_CHARGER:
+							if (storage.robots[This->y + 1][This->x] == CELL_EMPTY)
+							{
+								storage.robots[This->y + 1][This->x] = This->carries_box ? CELL_ROBOT_WITH_BOX_VER : CELL_ROBOT_VER;
+								storage.robots[This->y    ][This->x] = CELL_EMPTY;
+								This->y = This->y + 1;
+								
+								if 		(This->state == MOTION)
+									This->battery -= KEEP_MOTION_COST;
+								else if (This->state == STOP)
+									This->battery -= START_MOTION_COST;
+								
+								This->state = MOTION;
+							}
+                            break;
+                        case CELL_WALL:
+							This->state = STOP;
+							break;
+                        default:
+                            break;
+                    }
+                    break;
+				case MOVE_L:
+                    ++s->got_msgs_MOVE_L;
+					assert(This->orientation == HOR);
+					assert(This->x - 1 >= 0);
+                    switch(storage.room[This->y][This->x - 1])
+                    {
+                        case CELL_EMPTY:
+						case CELL_BOX:
+						case CELL_CONTAINER:
+						case CELL_CHARGER:
+							if (storage.robots[This->y][This->x - 1] == CELL_EMPTY)
+							{
+								storage.robots[This->y][This->x - 1] = This->carries_box ? CELL_ROBOT_WITH_BOX_HOR : CELL_ROBOT_HOR;
+								storage.robots[This->y][This->x    ] = CELL_EMPTY;
+								This->x = This->x - 1;
+								
+								if 		(This->state == MOTION)
+									This->battery -= KEEP_MOTION_COST;
+								else if (This->state == STOP)
+									This->battery -= START_MOTION_COST;
+								
+								This->state = MOTION;
+							}
+                            break;
+                        case CELL_WALL:
+							This->state = STOP;
+							break;
+                        default:
+                            break;
+                    }
+                    break;
+				case MOVE_R:
+                    ++s->got_msgs_MOVE_R;
+					assert(This->orientation == HOR);
+					assert(This->x + 1 < storage.length);
+                    switch(storage.room[This->y][This->x + 1])
+                    {
+                        case CELL_EMPTY:
+						case CELL_BOX:
+						case CELL_CONTAINER:
+						case CELL_CHARGER:
+							if (storage.robots[This->y][This->x + 1] == CELL_EMPTY)
+							{
+								storage.robots[This->y][This->x + 1] = This->carries_box ? CELL_ROBOT_WITH_BOX_HOR : CELL_ROBOT_HOR;
+								storage.robots[This->y][This->x]     = CELL_EMPTY;
+								This->x = This->x + 1;
+								
+								if 		(This->state == MOTION)
+									This->battery -= KEEP_MOTION_COST;
+								else if (This->state == STOP)
+									This->battery -= START_MOTION_COST;
+								
+								This->state = MOTION;
+							}
+                            break;
+                        case CELL_WALL:
+							This->state = STOP;
+							break;
+                        default:
+                            break;
+                    }
                     break;
                 case BOX_GRAB:
                     ++s->got_msgs_BOX_GRAB;
-                    switch(This->direction)         
-                    {
-                        case UP:
-                            assert(This->y - 1 >= 0); //to stay within the boundaries of the map
-                            cell_in_front.x     = This->x    ;
-                            cell_in_front.y     = This->y - 1;
-                            break;
-                        case DOWN:
-                            assert(This->y + 1 <= storage.height - 1);
-                            cell_in_front.x     = This->x    ;
-                            cell_in_front.y     = This->y + 1;
-                            break;
-                        case LEFT:
-                            assert(This->x - 1 >= 0);
-                            cell_in_front.x     = This->x - 1;
-                            cell_in_front.y     = This->y    ;
-                            break;    
-                        case RIGHT:
-                            assert(This->x + 1 <= storage.length - 1);
-                            cell_in_front.x     = This->x + 1;
-                            cell_in_front.y     = This->y    ;
-                            break;
-                    }
-
-                    cell_in_front.value = storage.data[cell_in_front.y][cell_in_front.x];
-
-                    if (cell_in_front.value == CELL_BOX && This->carries_box == FALSE)
+					if (This->state == MOTION)
+						This->battery -= STOP_MOTION_COST;
+					This->state = STOP;
+					
+                    if (storage.room[This->y][This->x] == CELL_BOX && This->carries_box == FALSE)
                     {
                         This->carries_box = TRUE;
-                        switch(This->direction)
-                        {
-                            case UP:
-                                storage.data[This->y][This->x] = CELL_ROBOT_WITH_BOX_UP;
-                                break;
-                            case DOWN:
-                                storage.data[This->y][This->x] = CELL_ROBOT_WITH_BOX_DOWN;
-                                break;
-                            case LEFT:
-                                storage.data[This->y][This->x] = CELL_ROBOT_WITH_BOX_LEFT;
-                                break;
-                            case RIGHT:
-                                storage.data[This->y][This->x] = CELL_ROBOT_WITH_BOX_RIGHT;
-                                break;
-                        }
+						if (This->orientation == VER)
+							storage.robots[This->y][This->x] = CELL_ROBOT_WITH_BOX_VER;
+						else
+							storage.robots[This->y][This->x] = CELL_ROBOT_WITH_BOX_HOR;
                         printf("ROBOT #%d: grab the box.\n", self);
-                        //storage.data[cell_in_front.y][cell_in_front.x] = CELL_WALL;
 						AssignDest(&Robots.data[self-1], CELL_CONTAINER);
-                        is_executed = TRUE;
-
                     }
                     break;
                 case BOX_DROP:
                     ++s->got_msgs_BOX_DROP;
-                    switch(This->direction)         
-                    {
-                        case UP:
-                            assert(This->y - 1 >= 0); //to stay within the boundaries of the map
-                            cell_in_front.x     = This->x    ;
-                            cell_in_front.y     = This->y - 1;
-                            break;
-                        case DOWN:
-                            assert(This->y + 1 <= storage.height - 1);
-                            cell_in_front.x     = This->x    ;
-                            cell_in_front.y     = This->y + 1;
-                            break;
-                        case LEFT:
-                            assert(This->x - 1 >= 0);
-                            cell_in_front.x     = This->x - 1;
-                            cell_in_front.y     = This->y    ;
-                            break;    
-                        case RIGHT:
-                            assert(This->x + 1 <= storage.length - 1);
-                            cell_in_front.x     = This->x + 1;
-                            cell_in_front.y     = This->y    ;
-                            break;
-                    }
-
-                    cell_in_front.value = storage.data[cell_in_front.y][cell_in_front.x];
-
-                    if (cell_in_front.value == CELL_CONTAINER && This->carries_box == TRUE)
+					if (This->state == MOTION)
+						This->battery -= STOP_MOTION_COST;
+					This->state = STOP;
+					
+                    if (storage.room[This->y][This->x] == CELL_CONTAINER && This->carries_box == TRUE)
                     {
                         This->carries_box = FALSE;
-                        switch(This->direction)
-                        {
-                            case UP:
-                                storage.data[This->y][This->x] = CELL_ROBOT_UP;
-                                break;
-                            case DOWN:
-                                storage.data[This->y][This->x] = CELL_ROBOT_DOWN;
-                                break;
-                            case LEFT:
-                                storage.data[This->y][This->x] = CELL_ROBOT_LEFT;
-                                break;
-                            case RIGHT:
-                                storage.data[This->y][This->x] = CELL_ROBOT_RIGHT;
-                                break;
-                        }
+						if (This->orientation == VER)
+							storage.robots[This->y][This->x] = CELL_ROBOT_VER;
+						else
+							storage.robots[This->y][This->x] = CELL_ROBOT_HOR;
+                        
 						printf("ROBOT #%d: drop the box.\n", self);
-                        //storage.data[cell_in_front.y][cell_in_front.x] = CELL_BOX;
-						AssignDest(&Robots.data[self-1], CELL_BOX);
-                        is_executed = TRUE;
-
+						
+						if (Robots.data[self-1].battery < TIME_TO_CHARGE_THRESHOLD)
+							AssignDest(&Robots.data[self-1], CELL_CHARGER);
+						else
+							AssignDest(&Robots.data[self-1], CELL_BOX);
                     }
                     break;
                 case INIT:
-                    ++s->got_msgs_INIT; 
+                    ++s->got_msgs_INIT;
+					if (This->state == MOTION)
+						This->battery -= STOP_MOTION_COST;
+					This->state = STOP;
                     break;
 				case NOP:
 					++s->got_msgs_NOP;
+					if (This->state == MOTION)
+						This->battery -= STOP_MOTION_COST;
+					This->state = STOP;
 					break;
                 default:
                     printf("ROBOT #%d: Unhandled forward message of type %d\n", self, in_msg->type);
             }
 
             if (in_msg->sender == 0) //the message came from the command center
-            {
                 SendMessage(0, lp, glb_time, RECEIVED);
-
-                if (is_executed == TRUE)
-                {
-                    //SendMessage(0, lp, glb_time, EXECUTED);
-                    //++s->sent_msgs_EXECUTED;
-                }
-            }
 
             break;
         }
@@ -429,16 +354,17 @@ void model_final(state* s, tw_lp* lp)
 {
     int self = lp->gid;
     if      (s->type == COMMAND_CENTER)
-        printf("COMMAND_CENTER: got %d messages of type ROTATE_LEFT\n",        s->got_msgs_ROTATE_LEFT);
+        printf("COMMAND_CENTER: got %d messages of type ROTATE\n",        s->got_msgs_ROTATE);
 	else if (s->type == ROBOT)
-		printf("ROBOT #%2d:      got %d messages of type ROTATE_LEFT\n", self, s->got_msgs_ROTATE_LEFT);
+		printf("ROBOT #%2d:      got %d messages of type ROTATE\n", self, s->got_msgs_ROTATE);
 			
-        printf("                got %d messages of type ROTATE_RIGHT\n", s->got_msgs_ROTATE_RIGHT);
-        printf("                got %d messages of type MOVE\n",         s->got_msgs_MOVE);
+        printf("                got %d messages of type MOVE_U\n",         s->got_msgs_MOVE_U);
+		printf("                got %d messages of type MOVE_D\n",         s->got_msgs_MOVE_D);
+		printf("                got %d messages of type MOVE_L\n",         s->got_msgs_MOVE_L);
+		printf("                got %d messages of type MOVE_R\n",         s->got_msgs_MOVE_R);
         printf("                got %d messages of type BOX_GRAB\n",     s->got_msgs_BOX_GRAB);
         printf("                got %d messages of type BOX_DROP\n",     s->got_msgs_BOX_DROP);
         printf("                got %d messages of type RECEIVED\n",     s->got_msgs_RECEIVED);
-        printf("                got %d messages of type EXECUTED\n",     s->got_msgs_EXECUTED);
         printf("                got %d messages of type INIT\n",         s->got_msgs_INIT);
 		printf("                got %d messages of type NOP\n",          s->got_msgs_NOP);
 }

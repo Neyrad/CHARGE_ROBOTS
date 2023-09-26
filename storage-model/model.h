@@ -16,25 +16,34 @@
 #include <assert.h>
 #include <time.h>
 
-#define CELL_ROBOT_UP    8
-#define CELL_ROBOT_RIGHT 6
-#define CELL_ROBOT_LEFT  4
-#define CELL_ROBOT_DOWN  2
+#define N_BOXES 3
+#define N_CONTAINERS 9
 
-#define CELL_ROBOT_WITH_BOX_UP    88
-#define CELL_ROBOT_WITH_BOX_RIGHT 66
-#define CELL_ROBOT_WITH_BOX_LEFT  44
-#define CELL_ROBOT_WITH_BOX_DOWN  22
+#define CELL_ROBOT_VER    		2
+#define CELL_ROBOT_HOR 			4
+#define CELL_ROBOT_WITH_BOX_VER 6
+#define CELL_ROBOT_WITH_BOX_HOR 8
 
+#define CELL_EMPTY     0
+#define CELL_WALL      1
 #define CELL_CONTAINER 3
 #define CELL_BOX       5
-#define CELL_WALL      1
-#define CELL_EMPTY     0
+#define CELL_CHARGER   7
 
 #define MAX_ROOM_HEIGHT 100
 #define MAX_ROOM_LENGTH 100
-
 #define MAX_COMMENT_LENGTH 1000
+#define MAX_ROBOTS 100
+#define MAX_INPUT_LENGTH 1000
+
+#define BATTERY_CAPACITY		  500
+#define START_MOTION_COST		    5
+#define KEEP_MOTION_COST		    1
+#define STOP_MOTION_COST		    0
+#define ROTATE_COST				    2
+#define TIME_TO_CHARGE_THRESHOLD  200
+#define CHARGE_CHUNK			   20               // charge per time unit
+#define CAPACITY_CHUNK             10				// decrease in capacity per cycle
 
 #define NONE -1
 
@@ -52,14 +61,25 @@ typedef enum
 	RIGHT = 6,
 } dir;
 
-struct room
+struct _storage
 {
-    int data[MAX_ROOM_HEIGHT][MAX_ROOM_LENGTH];
-    int height;
-    int length;
+    int room  [MAX_ROOM_HEIGHT][MAX_ROOM_LENGTH];
+	int robots[MAX_ROOM_HEIGHT][MAX_ROOM_LENGTH];
+	int height;
+	int length;
 };
 
-struct room storage;
+struct _storage storage;
+
+struct _pairs
+{
+	int data[MAX_INPUT_LENGTH][2];
+	int cur;
+	int length;
+	bool eof;
+};
+
+struct _pairs pairs;
 
 struct cell
 {
@@ -68,29 +88,33 @@ struct cell
     int value;
 };
 
-#define MAX_ROBOTS 100
+typedef enum
+{
+	HOR = 0,
+	VER = 1,
+} ori;
 
 struct _robot
 {
     int x;
     int y;
 	bool carries_box;
-	bool stuck;
-	bool unstucking;
-	dir direction;
+	bool charging;
+	ori orientation;
     
 	enum
 	{
 		STOP,
 		MOTION,
-		ROT_LEFT,
-		ROT_RIGHT,
-		BOX_IN,
-		BOX_OUT,
 	} state;
 	
+	int battery;
+	int capacity;
+	
 	struct cell dest;
-	dir dest_dir;
+	ori dest_ori;
+	
+	int pair[2];
 };
 
 struct _robots
@@ -101,17 +125,17 @@ struct _robots
 
 struct _robots Robots;
 
-
 //Example enumeration of message type... could also use #defines
 typedef enum
 {
-    ROTATE_LEFT,
-    ROTATE_RIGHT,
-    MOVE,
+    ROTATE,
+    MOVE_U,
+	MOVE_D,
+	MOVE_L,
+	MOVE_R,
     BOX_GRAB,
     BOX_DROP,
     RECEIVED,
-    EXECUTED,
     INIT,
 	NOP,
 } message_type;
@@ -135,19 +159,19 @@ typedef struct
 //   this defines the state of each LP
 typedef struct
 {
-    int got_msgs_ROTATE_LEFT;
-    int got_msgs_ROTATE_RIGHT;
-    int got_msgs_MOVE;
+    int got_msgs_ROTATE;
+    int got_msgs_MOVE_U;
+	int got_msgs_MOVE_D;
+	int got_msgs_MOVE_L;
+	int got_msgs_MOVE_R;
     int got_msgs_BOX_GRAB;
     int got_msgs_BOX_DROP;
     int got_msgs_RECEIVED;
-    int got_msgs_EXECUTED;
     int got_msgs_INIT;
 	int got_msgs_NOP;
 
     lp_type type;
     double value;
-
 } state;
 
 
@@ -175,7 +199,8 @@ tw_lp * model_mapping_to_lp(tw_lpid lpid);
 tw_peid model_map(tw_lpid gid);
 */
 
-extern void parse(const char* path);
+extern void Parse(const char* path, int arr[MAX_ROOM_HEIGHT][MAX_ROOM_LENGTH]);
+extern void ParsePairs(const char* path);
 extern void PrintMap(const char* log_folder_path);
 extern void PrintNSteps(const char* log_folder_path);
 extern void RobotsInit();
@@ -183,10 +208,10 @@ extern void RobotsPrint();
 extern void SendMessageContents(tw_lpid receiver, tw_lp* lp, double ts, lp_type type, double contents);
 extern void SendMessage(tw_lpid receiver, tw_lp* lp, double ts, lp_type type);
 extern void AssignDest(struct _robot* robot, int goal);
+extern void GetPair(struct _robot* robot);
 extern int EveryoneResponded(int* arr, int N);
 extern int CalcNextMove(struct _robot* robot);
-extern int Rotate(int cur, int des);
-extern int unstuck(struct _robot* me);
-extern bool NeighborAlsoStuck(struct _robot* This);
+extern int CalcNextMove2(struct _robot* robot);
+extern void PrintPairs();
 
 #endif

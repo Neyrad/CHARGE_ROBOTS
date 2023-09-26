@@ -11,8 +11,10 @@
 
 
 
-const char* path_to_log_folder   = "/mnt/c/Dev/Base/pygame/Simulation_History";
-const char* path_to_input_folder = "box.csv";
+const char* path_to_log_folder  = "/mnt/c/Dev/Base/pygame/Simulation_History";
+const char* path_to_room_file   = "field.csv";
+const char* path_to_robots_file = "robots.csv";
+const char* path_to_pairs       = "log.csv";
 
 
 
@@ -47,19 +49,22 @@ const tw_optdef model_opts[] = {
 
 extern int glb_time;
 
-//for doxygen
-#define model_main main
 
-int model_main (int argc, char* argv[])
+int main (int argc, char* argv[])
 {
 	srand(time(NULL));
-    parse(path_to_input_folder);
-
+	
+    Parse(path_to_room_file, storage.room);
+	Parse(path_to_robots_file, storage.robots);
+	
+	ParsePairs(path_to_pairs);
+	PrintPairs();
+	
     RobotsInit();
     assert(Robots.N);
 
     PrintMap(path_to_log_folder);
-    RobotsPrint(); 
+    RobotsPrint();
 
     int i;
     int num_lps_per_pe;
@@ -89,6 +94,7 @@ int model_main (int argc, char* argv[])
     // Do some file I/O here? on a per-node (not per-LP) basis
     tw_run();
     tw_end();
+
     PrintNSteps(path_to_log_folder);
 	printf("Final global time is %d\n", glb_time);
 }
