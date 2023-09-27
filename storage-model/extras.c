@@ -1,5 +1,9 @@
 #include "model.h"
 
+//The C extras file for a ROSS model
+//This file includes:
+// - all functions that are not from ROSS
+
 #define MAX_PATH_TO_LOG_FOLDER 256
 
 size_t step_number = 0;
@@ -174,7 +178,7 @@ void SendMessage(tw_lpid receiver, tw_lp* lp, double ts, lp_type type)
     SendMessageContents(receiver, lp, ts, type, tw_rand_unif(lp->rng));
 }
 
-int EveryoneResponded(int* arr, int N)
+bool EveryoneResponded(int* arr, int N)
 {
 	int cnt = 0;
 	for (int i = 0; i < N; ++i)
@@ -188,7 +192,7 @@ void AssignDest(struct _robot* robot, int goal)
 	if      (goal == CELL_BOX)
 	{
 		GetPair(robot);
-		switch(robot->pair[0]) //instead of random choice read BOX -> CONTAINER pair from the log file
+		switch(robot->pair[0])
 		{
 			case 1:
 				{
@@ -218,7 +222,7 @@ void AssignDest(struct _robot* robot, int goal)
 	}
 	else if (goal == CELL_CONTAINER)
 	{
-		switch(robot->pair[1]) //should already know based on the box number (box - contatiner pair from the log file)
+		switch(robot->pair[1])
 		{
 			case 1:
 				{
@@ -307,7 +311,6 @@ void AssignDest(struct _robot* robot, int goal)
 	}
 }
 
-/*
 int CalcNextMove(struct _robot* robot)
 {
 	int dist_X = robot->dest.x - robot->x;
@@ -340,9 +343,9 @@ int CalcNextMove(struct _robot* robot)
 	
 	return robot->dest.value == CELL_BOX ? BOX_GRAB : BOX_DROP;
 }
-*/
 
-int CalcNextMove2(struct _robot* robot) //running in circles
+
+int CalcNextMove2(struct _robot* robot)
 {
 	if (robot->charging)
 	{

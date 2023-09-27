@@ -19,7 +19,6 @@ void SWAP(double* a, double* b)
     *b = tmp;
 }
 
-int dest = 0;
 extern const char* path_to_log_folder;
 
 int glb_time = 0;
@@ -28,7 +27,7 @@ int RobotResponded[MAX_ROBOTS];
 //Init function
 // - called once for each LP
 // ! LP can only send messages to itself during init !
-void model_init (state *s, tw_lp *lp)
+void model_init(state *s, tw_lp *lp)
 {
     if (lp->gid == 0)
     {
@@ -75,7 +74,7 @@ void model_init (state *s, tw_lp *lp)
 }
 
 //Forward event handler
-void model_event (state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
+void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
 {
     int self = lp->gid;
     bool is_executed = FALSE;
@@ -90,7 +89,7 @@ void model_event (state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
     switch(s->type)
     {
         case COMMAND_CENTER:
-            switch (in_msg->type) //msg counter
+            switch (in_msg->type)
             {
                 case RECEIVED:
                     ++s->got_msgs_RECEIVED; 
@@ -336,17 +335,9 @@ void model_event (state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
 }
 
 //Reverse Event Handler
-void model_event_reverse (state *s, tw_bf *bf, message *in_msg, tw_lp *lp) {
-/*  int self = lp->gid;
-
-  // undo the state update using the value stored in the 'reverse' message
-  SWAP(&(s->value), &(in_msg->contents));
-
-  // handle the message
- 
-
-  // don't forget to undo all rng calls
-  tw_rand_reverse_unif(lp->rng);  */
+void model_event_reverse(state *s, tw_bf *bf, message *in_msg, tw_lp *lp)
+{
+	return;
 }
 
 //report any final statistics for this LP
@@ -362,9 +353,9 @@ void model_final(state* s, tw_lp* lp)
 		printf("                got %d messages of type MOVE_D\n",         s->got_msgs_MOVE_D);
 		printf("                got %d messages of type MOVE_L\n",         s->got_msgs_MOVE_L);
 		printf("                got %d messages of type MOVE_R\n",         s->got_msgs_MOVE_R);
-        printf("                got %d messages of type BOX_GRAB\n",     s->got_msgs_BOX_GRAB);
-        printf("                got %d messages of type BOX_DROP\n",     s->got_msgs_BOX_DROP);
-        printf("                got %d messages of type RECEIVED\n",     s->got_msgs_RECEIVED);
-        printf("                got %d messages of type INIT\n",         s->got_msgs_INIT);
-		printf("                got %d messages of type NOP\n",          s->got_msgs_NOP);
+        printf("                got %d messages of type BOX_GRAB\n",       s->got_msgs_BOX_GRAB);
+        printf("                got %d messages of type BOX_DROP\n",       s->got_msgs_BOX_DROP);
+        printf("                got %d messages of type RECEIVED\n",       s->got_msgs_RECEIVED);
+        printf("                got %d messages of type INIT\n",           s->got_msgs_INIT);
+		printf("                got %d messages of type NOP\n",            s->got_msgs_NOP);
 }

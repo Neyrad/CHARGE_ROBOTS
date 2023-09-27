@@ -87,7 +87,7 @@ def draw_window(cur_frame):
     pygame.display.update()
 
 
-TIME_PER_FRAME = 20
+TIME_PER_FRAME = 75
 
 def main():
     cur_frame = -1

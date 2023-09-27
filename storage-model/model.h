@@ -1,8 +1,7 @@
 //The header file template for a ROSS model
 //This file includes:
 // - the state and message structs
-// - extern'ed command line arguments
-// - custom mapping function prototypes (if needed)
+// - all function prototypes
 // - any other needed structs, enums, unions, or #defines
 
 #ifndef _model_h
@@ -43,7 +42,7 @@
 #define ROTATE_COST				    2
 #define TIME_TO_CHARGE_THRESHOLD  200
 #define CHARGE_CHUNK			   20               // charge per time unit
-#define CAPACITY_CHUNK             10				// decrease in capacity per cycle
+#define CAPACITY_CHUNK             50				// decrease in capacity per cycle
 
 #define NONE -1
 
@@ -71,6 +70,7 @@ struct _storage
 
 struct _storage storage;
 
+//BOX - CONTAINER pairs
 struct _pairs
 {
 	int data[MAX_INPUT_LENGTH][2];
@@ -125,7 +125,6 @@ struct _robots
 
 struct _robots Robots;
 
-//Example enumeration of message type... could also use #defines
 typedef enum
 {
     ROTATE,
@@ -192,26 +191,40 @@ extern void model_final(state* s, tw_lp* lp);
 extern tw_peid model_map(tw_lpid gid);
 extern tw_lpid model_typemap (tw_lpid gid);
 
-/*
-//Custom mapping prototypes
-void model_cutom_mapping(void);
-tw_lp * model_mapping_to_lp(tw_lpid lpid);
-tw_peid model_map(tw_lpid gid);
-*/
-
+// Converts .csv into 2D int array
 extern void Parse(const char* path, int arr[MAX_ROOM_HEIGHT][MAX_ROOM_LENGTH]);
 extern void ParsePairs(const char* path);
+
+// Prints a snapshot .csv
 extern void PrintMap(const char* log_folder_path);
+
+// Prints Number_of_Steps.txt file 
 extern void PrintNSteps(const char* log_folder_path);
+
 extern void RobotsInit();
+
+// Prints to the console coords of each robot
 extern void RobotsPrint();
+
 extern void SendMessageContents(tw_lpid receiver, tw_lp* lp, double ts, lp_type type, double contents);
 extern void SendMessage(tw_lpid receiver, tw_lp* lp, double ts, lp_type type);
+
+// Assign BOX, CONTAINER or CHARGER to the robot as destination
 extern void AssignDest(struct _robot* robot, int goal);
+
+// Get a BOX - CONTAINER pair from the 2D int array
 extern void GetPair(struct _robot* robot);
-extern int EveryoneResponded(int* arr, int N);
+
+// Each robot received a command
+extern bool EveryoneResponded(int* arr, int N);
+
+// Simple robot routing (occasionally they run into the central wall)
 extern int CalcNextMove(struct _robot* robot);
+
+// Circular robot routing (works properly)
 extern int CalcNextMove2(struct _robot* robot);
+
+// Unit test for the ParsePairs() func
 extern void PrintPairs();
 
 #endif
