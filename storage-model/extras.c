@@ -7,6 +7,12 @@
 #define MAX_PATH_TO_LOG_FOLDER 256
 
 size_t step_number = 0;
+extern int glb_time;
+
+extern const char* path_to_log_folder;
+extern const char* path_to_room_file;
+extern const char* path_to_robots_file;
+extern const char* path_to_pairs;
 
 void PrintMap(const char* log_folder_path)
 {   
@@ -90,12 +96,17 @@ void Parse(const char* path, int arr[MAX_ROOM_HEIGHT][MAX_ROOM_LENGTH])
     }
 }
 
-void ParsePairs(const char* path)
+void PairsInit(const char* path)
 {
+	pairs.data = calloc(MAX_INPUT_LENGTH, sizeof(int*));
+	for (size_t i = 0; i < MAX_INPUT_LENGTH; ++i)
+		pairs.data[i] = calloc(2, sizeof(int));
+
     struct stat stats;
     stat(path, &stats);
     FILE* f = fopen(path, "r");
     assert(f); //to check correctness of the path
+	assert(stats.st_size < MAX_INPUT_LENGTH * 4);
     char buf[MAX_INPUT_LENGTH * 4]; //'1' ',' '2' '\n' -> 4 columns
     fread(buf, sizeof(buf[0]), stats.st_size, f);
     fclose(f);
@@ -118,6 +129,13 @@ void ParsePairs(const char* path)
     }
 	pairs.cur = 0;
 	pairs.eof = FALSE;
+}
+
+void FreePairs()
+{	
+	for (size_t i = 0; i < MAX_INPUT_LENGTH; ++i)
+		free(pairs.data[i]);
+	free(pairs.data);
 }
 
 void RobotsInit()
@@ -148,6 +166,7 @@ void RobotsInit()
                 ++Robots.N;
                 assert(Robots.N <= MAX_ROBOTS);
             }
+	assert(Robots.N);
 }
 
 void RobotsPrint()
@@ -347,11 +366,27 @@ int CalcNextMove(struct _robot* robot)
 
 int CalcNextMove2(struct _robot* robot)
 {
-	if (robot->charging)
+	if (robot->battery.charge <= 0)
+		printf("CalcNextMove2(): robot->battery.charge == %d\n", robot->battery.charge);
+	assert(robot->battery.charge > 0); //make sure energy costs in model.h are not too high
+	assert(robot->battery.charge <= robot->battery.capacity);
+	
+	
+	if (robot->time_in_action > 1) //current action not finished
 	{
-		if (robot->battery < robot->capacity)
+		robot->time_in_action -= 1;
+		return NOP;
+	}
+	
+	
+	if (robot->battery.charging)
+	{
+		if (robot->battery.charge < robot->battery.capacity)
 		{
-			robot->battery += CHARGE_CHUNK;
+			robot->battery.charge += CHARGE_CHUNK;
+			if (robot->battery.charge > robot->battery.capacity)
+				robot->battery.charge = robot->battery.capacity;
+			robot->battery.time_spent_charging += 1;
 			return NOP;
 		}
 		
@@ -361,9 +396,10 @@ int CalcNextMove2(struct _robot* robot)
 			{
 				if (robot->orientation == HOR)
 				{
-					robot->capacity -= CAPACITY_CHUNK;
-					robot->battery  = robot->capacity;
-					robot->charging = FALSE;
+					robot->battery.times_recharged += 1;
+					robot->battery.capacity 		= CalculateCapacity(robot);
+					robot->battery.charge  			= robot->battery.capacity;
+					robot->battery.charging 		= FALSE;
 					AssignDest(robot, CELL_BOX);
 					return MOVE_R;
 				}
@@ -375,15 +411,16 @@ int CalcNextMove2(struct _robot* robot)
 			{
 				if (robot->orientation == VER)
 				{
-					robot->capacity -= CAPACITY_CHUNK;
-					robot->battery  = BATTERY_CAPACITY;
-					robot->charging = FALSE;
+					robot->battery.times_recharged += 1;
+					robot->battery.capacity 		= CalculateCapacity(robot);
+					robot->battery.charge  			= robot->battery.capacity;
+					robot->battery.charging 		= FALSE;
 					AssignDest(robot, CELL_BOX);
 					return MOVE_D;
 				}
 				else
 					return ROTATE;
-			}	
+			}
 		}
 	}
 	
@@ -398,7 +435,7 @@ int CalcNextMove2(struct _robot* robot)
 				case CELL_CONTAINER:
 					return BOX_DROP;
 				case CELL_CHARGER:
-					robot->charging = TRUE;
+					robot->battery.charging = TRUE;
 					return NOP;
 			}
 		}
@@ -445,4 +482,131 @@ void GetPair(struct _robot* robot)
 	robot->pair[0] = pairs.data[pairs.cur][0];
 	robot->pair[1] = pairs.data[pairs.cur][1];
 	++pairs.cur;
+}
+
+void InitBDM(struct _robot* robot, BatteryType BT)
+{
+	robot->battery.BDM_cur = 0;
+	robot->battery.type = BT;
+	switch(robot->battery.type)
+	{
+		case LiFePO4:
+			{
+			const float A =  0.00000005;
+			const float B = -0.000287;
+			const float C =  1;
+	
+			for (int i = 0; i < MAX_CYCLES_LiFePO4; ++i)
+				robot->battery.BDM[i] = (A*i*i + B*i + C) * BATTERY_CAPACITY;
+			}
+			break;
+		case LiNiMnCoO2:
+			{
+			const float A1 =  -0.00022;
+			const float B1 =   1;
+			const float A2 =  -0.001;
+			const float B2 =   1.663;
+			const int FUNC_CHANGE_CYCLE = 850;	
+	
+			for (int i = 0;   i < FUNC_CHANGE_CYCLE && i < MAX_CYCLES_LiNiMnCoO2; ++i)
+				robot->battery.BDM[i] = (A1*i + B1) * BATTERY_CAPACITY;
+			for (int i = FUNC_CHANGE_CYCLE;            i < MAX_CYCLES_LiNiMnCoO2; ++i)
+				robot->battery.BDM[i] = (A2*i + B2) * BATTERY_CAPACITY;
+			}
+			break;
+		default:
+			printf("InitBDM(): Unknown battery type [%d]\n", robot->battery.type);
+			return;
+	}
+}
+
+void PrintBDM(struct _robot* robot)
+{
+	int MAX_CYCLES = -1;
+	switch(robot->battery.type)
+	{
+		case LiFePO4:
+			MAX_CYCLES = MAX_CYCLES_LiFePO4;
+			break;
+		case LiNiMnCoO2:
+			MAX_CYCLES = MAX_CYCLES_LiNiMnCoO2;
+			break;
+		default:
+			printf("PrintBDM(): Unknown battery type [%d]\n", robot->battery.type);
+			return;
+	}
+	for (int i = 0; i < MAX_CYCLES; ++i)
+		printf("robot->battery.BDM[%d] = %d\n", i, robot->battery.BDM[i]);
+}
+
+int CalculateCapacity(struct _robot* robot)
+{
+	int MAX_CYCLES = -1;
+	switch(robot->battery.type)
+	{
+		case LiFePO4:
+			MAX_CYCLES = MAX_CYCLES_LiFePO4;
+			break;
+		case LiNiMnCoO2:
+			MAX_CYCLES = MAX_CYCLES_LiNiMnCoO2;
+			break;
+		default:
+			printf("CalculateCapacity(): Unknown battery type [%d]\n", robot->battery.type);
+			return -1;
+	}
+	if (robot->battery.BDM_cur == MAX_CYCLES - 1)
+		printf("\n\n\nCalculateCapacity(): battery of the robot #??? died... (robot->battery.BDM_cur == %d) && (MAX_CYCLES == %d)\n\n\n\n", \
+											robot->battery.BDM_cur, MAX_CYCLES);
+	//assert(robot->battery.BDM_cur < MAX_CYCLES);
+	assert(robot->battery.BDM[robot->battery.BDM_cur] > 0);
+	return robot->battery.BDM[robot->battery.BDM_cur++];
+}
+
+void SimulateROSS(int argc, char* argv[])
+{
+	ValidateMacros();
+	int i, num_lps_per_pe;
+    tw_opt_add(model_opts);
+    tw_init(&argc, &argv);
+    num_lps_per_pe = Robots.N + 1; //n robots + command center
+    tw_define_lps(num_lps_per_pe, sizeof(message));
+    g_tw_lp_typemap = &model_typemap;
+    for (int i = 0; i < g_tw_nlp; ++i)
+        tw_lp_settype(i, &model_lps[0]);
+    tw_run();
+    tw_end();
+	printf("\nFinal global time is %d days\n", glb_time / (2 * 60 * 60 * 24));
+}
+
+void ValidateMacros()
+{
+	assert(MAX_CYCLES_LiFePO4 <= MAX_CYCLES_OF_ALL_TYPES);
+	assert(MAX_CYCLES_LiNiMnCoO2 <= MAX_CYCLES_OF_ALL_TYPES);
+}
+
+void FilesInit()
+{
+	Parse(path_to_room_file, storage.room);
+	Parse(path_to_robots_file, storage.robots);	
+}
+
+void InitROSS()
+{
+	FilesInit();
+	PairsInit(path_to_pairs);
+    RobotsInit();
+	
+	RobotsPrint();
+    PrintMap(path_to_log_folder);
+}
+
+void Free()
+{
+	FreePairs();
+}
+
+void FinalizeROSS()
+{
+	PrintNSteps(path_to_log_folder);
+	Free();
 }

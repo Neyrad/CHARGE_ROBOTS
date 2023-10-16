@@ -33,18 +33,34 @@
 #define MAX_ROOM_LENGTH 100
 #define MAX_COMMENT_LENGTH 1000
 #define MAX_ROBOTS 100
-#define MAX_INPUT_LENGTH 1000
+//#define MAX_INPUT_LENGTH 20000000
+#define MAX_INPUT_LENGTH 2000000
 
-#define BATTERY_CAPACITY		  500
-#define START_MOTION_COST		    5
-#define KEEP_MOTION_COST		    1
-#define STOP_MOTION_COST		    0
-#define ROTATE_COST				    2
-#define TIME_TO_CHARGE_THRESHOLD  200
-#define CHARGE_CHUNK			   20               // charge per time unit
-#define CAPACITY_CHUNK             50				// decrease in capacity per cycle
+/*------------------ENERGY COST DEFINES------------------*/
+#define BATTERY_CAPACITY		 80000
+#define START_MOTION_COST		     8
+#define KEEP_MOTION_COST		     2
+#define STOP_MOTION_COST		     0
+#define ROTATE_COST				     4
+#define TIME_TO_CHARGE_THRESHOLD 32000
+#define CHARGE_CHUNK			     8               // charge per time unit
+
+
+/*-------------------TIME COST DEFINES-------------------*/
+#define ROTATE_TIME 8
+#define MOVE_TIME 1
+#define BOX_GRAB_TIME 4
+#define BOX_DROP_TIME 2
+
+
 
 #define NONE -1
+
+#define MAX_CYCLES_LiFePO4      2000
+#define MAX_CYCLES_LiNiMnCoO2   1500
+#define MAX_CYCLES_OF_ALL_TYPES 2000 // put here the largest number of the above
+
+#define GLOBAL_TIME_END (2 * 60 * 60 * 24 * 1) //each step is 0.5 sec
 
 typedef enum
 {
@@ -73,7 +89,8 @@ struct _storage storage;
 //BOX - CONTAINER pairs
 struct _pairs
 {
-	int data[MAX_INPUT_LENGTH][2];
+	//int data[MAX_INPUT_LENGTH][2];
+	int** data;
 	int cur;
 	int length;
 	bool eof;
@@ -94,26 +111,42 @@ typedef enum
 	VER = 1,
 } ori;
 
+typedef enum
+{
+	LiFePO4    = 0,
+	LiNiMnCoO2 = 1,
+} BatteryType;
+
+struct _battery
+{
+	bool charging;
+	
+	int times_recharged;
+	int time_spent_charging;
+	
+	int charge;
+	int capacity;
+	
+	int BDM[MAX_CYCLES_OF_ALL_TYPES];
+	int BDM_cur;
+	BatteryType type;
+};
+
 struct _robot
 {
     int x;
     int y;
 	bool carries_box;
-	bool charging;
 	ori orientation;
-    
+	struct _battery battery;
 	enum
 	{
 		STOP,
 		MOTION,
 	} state;
-	
-	int battery;
-	int capacity;
-	
+	int time_in_action;
 	struct cell dest;
 	ori dest_ori;
-	
 	int pair[2];
 };
 
@@ -135,7 +168,7 @@ typedef enum
     BOX_GRAB,
     BOX_DROP,
     RECEIVED,
-    INIT,
+	INIT,
 	NOP,
 } message_type;
 
@@ -166,20 +199,19 @@ typedef struct
     int got_msgs_BOX_GRAB;
     int got_msgs_BOX_DROP;
     int got_msgs_RECEIVED;
-    int got_msgs_INIT;
+	int got_msgs_INIT;
 	int got_msgs_NOP;
+	
+	int boxes_delivered;
 
     lp_type type;
     double value;
 } state;
 
+extern const tw_optdef model_opts[];
 
 //Command Line Argument declarations
 extern unsigned int setting_1;
-
-//Global variables used by both main and driver
-// - this defines the LP types
-extern tw_lptype model_lps[];
 
 //Function Declarations
 // defined in driver.c:
@@ -191,9 +223,16 @@ extern void model_final(state* s, tw_lp* lp);
 extern tw_peid model_map(tw_lpid gid);
 extern tw_lpid model_typemap (tw_lpid gid);
 
+//Global variables used by both main and driver
+// - this defines the LP types
+extern tw_lptype model_lps[];
+
 // Converts .csv into 2D int array
 extern void Parse(const char* path, int arr[MAX_ROOM_HEIGHT][MAX_ROOM_LENGTH]);
-extern void ParsePairs(const char* path);
+extern void PairsInit(const char* path);
+
+// Frees the memory
+extern void FreePairs();
 
 // Prints a snapshot .csv
 extern void PrintMap(const char* log_folder_path);
@@ -226,5 +265,18 @@ extern int CalcNextMove2(struct _robot* robot);
 
 // Unit test for the ParsePairs() func
 extern void PrintPairs();
+
+// Battery Degradation Model curve init
+extern void InitBDM(struct _robot* robot, BatteryType BT);
+
+extern void PrintBDM(struct _robot* robot);
+extern int CalculateCapacity(struct _robot* robot);
+
+extern void SimulateROSS(int argc, char* argv[]);
+extern void ValidateMacros();
+extern void FilesInit();
+extern void InitROSS();
+extern void Free();
+extern void FinalizeROSS();
 
 #endif
