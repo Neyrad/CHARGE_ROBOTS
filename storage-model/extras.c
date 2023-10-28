@@ -194,7 +194,7 @@ void SendMessageContents(tw_lpid receiver, tw_lp* lp, double ts, lp_type type, d
 
 void SendMessage(tw_lpid receiver, tw_lp* lp, double ts, lp_type type)
 {
-    SendMessageContents(receiver, lp, ts, type, tw_rand_unif(lp->rng));
+    SendMessageContents(receiver, lp, ts, type, 0);
 }
 
 bool EveryoneResponded(int* arr, int N)
@@ -367,8 +367,11 @@ int CalcNextMove(struct _robot* robot)
 int CalcNextMove2(struct _robot* robot)
 {
 	if (robot->battery.charge <= 0)
+	{
 		printf("CalcNextMove2(): robot->battery.charge == %d\n", robot->battery.charge);
-	assert(robot->battery.charge > 0); //make sure energy costs in model.h are not too high
+		//BatteryDeath();
+		//return DEAD; //battery is dead
+	}//assert(robot->battery.charge > 0); //make sure energy costs in model.h are not too high
 	assert(robot->battery.charge <= robot->battery.capacity);
 	
 	
@@ -491,17 +494,17 @@ void InitBDM(struct _robot* robot, BatteryType BT)
 	switch(robot->battery.type)
 	{
 		case LiFePO4:
-			{
+		{
 			const float A =  0.00000005;
 			const float B = -0.000287;
 			const float C =  1;
 	
 			for (int i = 0; i < MAX_CYCLES_LiFePO4; ++i)
 				robot->battery.BDM[i] = (A*i*i + B*i + C) * BATTERY_CAPACITY;
-			}
+		}
 			break;
 		case LiNiMnCoO2:
-			{
+		{
 			const float A1 =  -0.00022;
 			const float B1 =   1;
 			const float A2 =  -0.001;
@@ -512,7 +515,81 @@ void InitBDM(struct _robot* robot, BatteryType BT)
 				robot->battery.BDM[i] = (A1*i + B1) * BATTERY_CAPACITY;
 			for (int i = FUNC_CHANGE_CYCLE;            i < MAX_CYCLES_LiNiMnCoO2; ++i)
 				robot->battery.BDM[i] = (A2*i + B2) * BATTERY_CAPACITY;
-			}
+		}
+			break;
+		case LeadAcid:
+		{
+			/*
+			
+			y = k*x + b
+			
+			k = (y2 - y1) / (x2 - x1)
+			b = y1 - k*x1
+			
+			*/
+	
+			struct point points[10] = {{0,   1},    {25,  0.99}, {50,  0.92}, \
+									   {75,  0.85}, {100, 0.77}, {125, 0.75}, \
+									   {150, 0.72}, {175, 0.65}, {200, 0.62}, \
+									   {225, 0.6}};
+									   
+			float k = 0;
+			float b = 0;
+			int cur_pnt = 0;
+	
+			for (int i = 0; i < MAX_CYCLES_LeadAcid; ++i)
+			{
+				if (i == points[cur_pnt].x && cur_pnt < 9)
+				{
+					k = (points[cur_pnt + 1].y - points[cur_pnt].y) / \
+						(points[cur_pnt + 1].x - points[cur_pnt].x);
+						
+					b = points[cur_pnt].y - k * points[cur_pnt].x;
+					
+					//printf("InitBDM(): k = %f, b = %f\n", k, b);
+					
+					++cur_pnt;
+				}
+				robot->battery.BDM[i] = (k * i + b) * BATTERY_CAPACITY;
+			}	
+		}
+			break;
+		case LiCoO2:
+		{
+			/*
+			
+			y = k*x + b
+			
+			k = (y2 - y1) / (x2 - x1)
+			b = y1 - k*x1
+			
+			*/
+	
+			struct point points[12] = {{0,   1},    {45,  1.003}, {90,  1},     \
+									   {430,  0.9}, {450, 0.89},  {500, 0.87},  \
+									   {535, 0.85}, {580, 0.81},  {600, 0.765}, \
+									   {625, 0.71}, {650, 0.655}, {680, 0.62}    };
+									   
+			float k = 0;
+			float b = 0;
+			int cur_pnt = 0;
+	
+			for (int i = 0; i < MAX_CYCLES_LiCoO2; ++i)
+			{
+				if (i == points[cur_pnt].x && cur_pnt < 11)
+				{
+					k = (points[cur_pnt + 1].y - points[cur_pnt].y) / \
+						(points[cur_pnt + 1].x - points[cur_pnt].x);
+						
+					b = points[cur_pnt].y - k * points[cur_pnt].x;
+					
+					//printf("InitBDM(): k = %f, b = %f\n", k, b);
+					
+					++cur_pnt;
+				}
+				robot->battery.BDM[i] = (k * i + b) * BATTERY_CAPACITY;
+			}	
+		}
 			break;
 		default:
 			printf("InitBDM(): Unknown battery type [%d]\n", robot->battery.type);
@@ -520,23 +597,48 @@ void InitBDM(struct _robot* robot, BatteryType BT)
 	}
 }
 
-void PrintBDM(struct _robot* robot)
+void PrintBDM(struct _robot* robot, const char* print_to)
 {
 	int MAX_CYCLES = -1;
 	switch(robot->battery.type)
 	{
 		case LiFePO4:
 			MAX_CYCLES = MAX_CYCLES_LiFePO4;
+			printf("PrintBDM(): Battery type LiFePO4\n");
 			break;
 		case LiNiMnCoO2:
 			MAX_CYCLES = MAX_CYCLES_LiNiMnCoO2;
+			printf("PrintBDM(): Battery type LiNiMnCoO2\n");
+			break;
+		case LeadAcid:
+			MAX_CYCLES = MAX_CYCLES_LeadAcid;
+			printf("PrintBDM(): Battery type LeadAcid\n");
+			break;
+		case LiCoO2:
+			MAX_CYCLES = MAX_CYCLES_LiCoO2;
+			printf("PrintBDM(): Battery type LiCoO2\n");
 			break;
 		default:
 			printf("PrintBDM(): Unknown battery type [%d]\n", robot->battery.type);
 			return;
 	}
-	for (int i = 0; i < MAX_CYCLES; ++i)
-		printf("robot->battery.BDM[%d] = %d\n", i, robot->battery.BDM[i]);
+	
+	if (print_to == "console" || print_to == "Console" || print_to == "CONSOLE")
+	{
+		for (int i = 0; i < MAX_CYCLES; ++i)
+			printf("robot->battery.BDM[%d] = %d\n", i, robot->battery.BDM[i]);
+	}
+	
+	else
+	{
+		FILE* f = fopen(print_to, "w");
+		assert(f);
+		
+		for (int i = 0; i < MAX_CYCLES; ++i)
+			fprintf(f, "%d,%f\n", i, (float)robot->battery.BDM[i] / (float)BATTERY_CAPACITY);
+		
+		fclose(f);
+	}
 }
 
 int CalculateCapacity(struct _robot* robot)
@@ -550,15 +652,24 @@ int CalculateCapacity(struct _robot* robot)
 		case LiNiMnCoO2:
 			MAX_CYCLES = MAX_CYCLES_LiNiMnCoO2;
 			break;
+		case LeadAcid:
+			MAX_CYCLES = MAX_CYCLES_LeadAcid;
+			break;
+		case LiCoO2:
+			MAX_CYCLES = MAX_CYCLES_LiCoO2;
+			break;
 		default:
 			printf("CalculateCapacity(): Unknown battery type [%d]\n", robot->battery.type);
 			return -1;
 	}
+	
 	if (robot->battery.BDM_cur == MAX_CYCLES - 1)
-		printf("\n\n\nCalculateCapacity(): battery of the robot #??? died... (robot->battery.BDM_cur == %d) && (MAX_CYCLES == %d)\n\n\n\n", \
-											robot->battery.BDM_cur, MAX_CYCLES);
+	{
+		//BatteryDeath();
+		printf("\n\n\nCalculateCapacity(): battery of the robot #??? died...\n\n\n\n");
+	}
 	//assert(robot->battery.BDM_cur < MAX_CYCLES);
-	assert(robot->battery.BDM[robot->battery.BDM_cur] > 0);
+	//assert(robot->battery.BDM[robot->battery.BDM_cur] > 0);
 	return robot->battery.BDM[robot->battery.BDM_cur++];
 }
 
@@ -575,13 +686,15 @@ void SimulateROSS(int argc, char* argv[])
         tw_lp_settype(i, &model_lps[0]);
     tw_run();
     tw_end();
-	printf("\nFinal global time is %d days\n", glb_time / (2 * 60 * 60 * 24));
+	printf("\nFinal global time is %d days\n", glb_time / (9000 * 24));
 }
 
 void ValidateMacros()
 {
-	assert(MAX_CYCLES_LiFePO4 <= MAX_CYCLES_OF_ALL_TYPES);
+	assert(MAX_CYCLES_LiFePO4    <= MAX_CYCLES_OF_ALL_TYPES);
 	assert(MAX_CYCLES_LiNiMnCoO2 <= MAX_CYCLES_OF_ALL_TYPES);
+	assert(MAX_CYCLES_LeadAcid   <= MAX_CYCLES_OF_ALL_TYPES);
+	assert(MAX_CYCLES_LiCoO2     <= MAX_CYCLES_OF_ALL_TYPES);
 }
 
 void FilesInit()
@@ -610,3 +723,11 @@ void FinalizeROSS()
 	PrintNSteps(path_to_log_folder);
 	Free();
 }
+
+/*
+void BatteryDeath(struct _robot* robot)
+{
+	storage.robots[robot->y][robot->x] = CELL_EMPTY;
+	robot->battery.dead = TRUE;
+}
+*/

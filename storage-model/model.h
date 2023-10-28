@@ -37,30 +37,33 @@
 #define MAX_INPUT_LENGTH 2000000
 
 /*------------------ENERGY COST DEFINES------------------*/
-#define BATTERY_CAPACITY		 80000
-#define START_MOTION_COST		     8
-#define KEEP_MOTION_COST		     2
+#define BATTERY_CAPACITY		152000
+#define START_MOTION_COST		    44
+#define KEEP_MOTION_COST		     7
 #define STOP_MOTION_COST		     0
-#define ROTATE_COST				     4
-#define TIME_TO_CHARGE_THRESHOLD 32000
-#define CHARGE_CHUNK			     8               // charge per time unit
+#define ROTATE_COST				    16
+#define TIME_TO_CHARGE_THRESHOLD 51200
+#define CHARGE_CHUNK			    64 // charge per time unit
 
 
 /*-------------------TIME COST DEFINES-------------------*/
-#define ROTATE_TIME 8
-#define MOVE_TIME 1
-#define BOX_GRAB_TIME 4
-#define BOX_DROP_TIME 2
-
-
-
-#define NONE -1
+#define ROTATE_TIME 3 	// 1.2 sec
+#define MOVE_TIME 1		
+#define BOX_GRAB_TIME 2
+#define BOX_DROP_TIME 1
 
 #define MAX_CYCLES_LiFePO4      2000
 #define MAX_CYCLES_LiNiMnCoO2   1500
+#define MAX_CYCLES_LeadAcid     220
+#define MAX_CYCLES_LiCoO2       680
 #define MAX_CYCLES_OF_ALL_TYPES 2000 // put here the largest number of the above
 
-#define GLOBAL_TIME_END (2 * 60 * 60 * 24 * 1) //each step is 0.5 sec
+// each step is 0.4 sec
+// since ROBOT_VELOCITY = 2.5 m/s &&
+//		1 (m/step) / ROBOT_VELOCITY (m/s) = 0.4 (sec/step)
+// 9000 * 0.4 = 3600
+// => 1 hr of real time is 9000 simulation steps
+#define GLOBAL_TIME_END (9000 * 24 * 30)
 
 typedef enum
 {
@@ -75,6 +78,12 @@ typedef enum
 	LEFT  = 4,
 	RIGHT = 6,
 } dir;
+
+struct point
+{
+	float x;
+	float y;
+};
 
 struct _storage
 {
@@ -115,11 +124,14 @@ typedef enum
 {
 	LiFePO4    = 0,
 	LiNiMnCoO2 = 1,
+	LeadAcid   = 2,
+	LiCoO2     = 3,
 } BatteryType;
 
 struct _battery
 {
 	bool charging;
+	//bool dead;
 	
 	int times_recharged;
 	int time_spent_charging;
@@ -129,6 +141,7 @@ struct _battery
 	
 	int BDM[MAX_CYCLES_OF_ALL_TYPES];
 	int BDM_cur;
+	
 	BatteryType type;
 };
 
@@ -136,18 +149,23 @@ struct _robot
 {
     int x;
     int y;
+
+	int time_in_action;
 	bool carries_box;
+	struct cell dest;
+	
 	ori orientation;
+	ori dest_ori;
+	
 	struct _battery battery;
+
+	int pair[2];
+	
 	enum
 	{
 		STOP,
 		MOTION,
-	} state;
-	int time_in_action;
-	struct cell dest;
-	ori dest_ori;
-	int pair[2];
+	} state;	
 };
 
 struct _robots
@@ -269,7 +287,7 @@ extern void PrintPairs();
 // Battery Degradation Model curve init
 extern void InitBDM(struct _robot* robot, BatteryType BT);
 
-extern void PrintBDM(struct _robot* robot);
+extern void PrintBDM(struct _robot* robot, const char* print_to);
 extern int CalculateCapacity(struct _robot* robot);
 
 extern void SimulateROSS(int argc, char* argv[]);

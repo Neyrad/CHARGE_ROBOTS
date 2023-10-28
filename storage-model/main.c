@@ -17,6 +17,7 @@ const char* path_to_pairs       = "log.csv";
 
 	LiFePO4
 	LiNiMnCoO2
+	LeadAcid
 */
 
 

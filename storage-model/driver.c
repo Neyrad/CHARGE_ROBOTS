@@ -49,7 +49,7 @@ int RobotResponded[MAX_ROBOTS];
 //Init function
 // - called once for each LP
 // ! LP can only send messages to itself during init !
-void model_init(state *s, tw_lp *lp)
+void model_init(state* s, tw_lp* lp)
 {
     if (lp->gid == 0)
     {
@@ -58,7 +58,8 @@ void model_init(state *s, tw_lp *lp)
 		for (int i = 0; i < Robots.N; ++i)
 		{
 			RobotResponded[i] = FALSE;
-			InitBDM(&Robots.data[i], (i % 2)? LiNiMnCoO2: LiFePO4);
+			InitBDM(&Robots.data[i], (i == 0)? LiFePO4: (i == 1)? LiNiMnCoO2: (i == 2)? LeadAcid: LiCoO2);
+			PrintBDM(&Robots.data[i], (i == 0)? "graph/LiFePO4.csv": (i == 1)? "graph/LiNiMnCoO2.csv": (i == 2)? "graph/LeadAcid.csv": "graph/LiCoO2.csv");
 		}
 		
         printf("COMMAND_CENTER is initialized\n");
@@ -72,6 +73,7 @@ void model_init(state *s, tw_lp *lp)
 		Robots.data[lp->gid - 1].battery.charge   		     = BATTERY_CAPACITY;
 		Robots.data[lp->gid - 1].battery.capacity        	 = BATTERY_CAPACITY;
 		Robots.data[lp->gid - 1].battery.charging        	 = FALSE;
+		//Robots.data[lp->gid - 1].battery.dead        	 	 = FALSE;
 		Robots.data[lp->gid - 1].time_in_action  			 = 0; //no commands received, no actions performed
 		Robots.data[lp->gid - 1].battery.times_recharged 	 = 0;
 		Robots.data[lp->gid - 1].battery.time_spent_charging = 0;
@@ -125,6 +127,12 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
                 case RECEIVED:
                     ++s->got_msgs_RECEIVED; 
                     break;
+					/*
+				case DEAD;
+					++s->got_msgs_DEAD;
+					BatteryDeath(&Robots.data[in_msg->sender - 1]);
+					break;
+					*/
                 default:
                     printf("COMMAND CENTER: Unhandled forward message type %d\n", in_msg->type);
             }
@@ -134,7 +142,9 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
 			
 			for (int i = 0; i < Robots.N; ++i)
 				if (Robots.data[i].battery.BDM_cur >= MAX_CYCLES_LiFePO4    && Robots.data[i].battery.type == LiFePO4 || \
-					Robots.data[i].battery.BDM_cur >= MAX_CYCLES_LiNiMnCoO2 && Robots.data[i].battery.type == LiNiMnCoO2)
+					Robots.data[i].battery.BDM_cur >= MAX_CYCLES_LiNiMnCoO2 && Robots.data[i].battery.type == LiNiMnCoO2 || \
+					Robots.data[i].battery.BDM_cur >= MAX_CYCLES_LeadAcid   && Robots.data[i].battery.type == LeadAcid || \
+					Robots.data[i].battery.BDM_cur >= MAX_CYCLES_LiCoO2     && Robots.data[i].battery.type == LiCoO2)
 						return;
 
 			RobotResponded[in_msg->sender-1] = TRUE;
@@ -394,7 +404,7 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
 }
 
 //Reverse Event Handler
-void model_event_reverse(state *s, tw_bf *bf, message *in_msg, tw_lp *lp)
+void model_event_reverse(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
 {
 	return;
 }
@@ -405,8 +415,10 @@ void model_final(state* s, tw_lp* lp)
     int self = lp->gid;
     if      (s->type == COMMAND_CENTER)
 	{
-        printf("COMMAND_CENTER:\n");
+        /*
+		printf("COMMAND_CENTER:\n");
 		printf("                got %4d messages of type RECEIVED\n",   	s->got_msgs_RECEIVED);
+		*/
 	}
 	else if (s->type == ROBOT)
 	{
@@ -414,16 +426,23 @@ void model_final(state* s, tw_lp* lp)
 		switch(Robots.data[self-1].battery.type)
 		{
 			case LiFePO4:
-				printf("LiFePO4:\n");
+				printf("LiFePO4:\n\n");
 				break;
 			case LiNiMnCoO2:
-				printf("LiNiMnCoO2:\n");
+				printf("LiNiMnCoO2:\n\n");
+				break;
+			case LeadAcid:
+				printf("LeadAcid:\n\n");
+				break;
+			case LiCoO2:
+				printf("LiCoO2:\n\n");
 				break;
 			default:
-				printf("UNKNOWN:\n");
+				printf("UNKNOWN:\n\n");
 				break;
 		}
 		
+		/*
 		printf("                got %8d messages of type ROTATE\n", 		s->got_msgs_ROTATE);
 		printf("                got %8d messages of type MOVE_U\n",         s->got_msgs_MOVE_U);
 		printf("                got %8d messages of type MOVE_D\n",         s->got_msgs_MOVE_D);
@@ -433,20 +452,22 @@ void model_final(state* s, tw_lp* lp)
 		printf("                got %8d messages of type BOX_DROP\n",       s->got_msgs_BOX_DROP);
 		printf("                got %8d messages of type INIT\n",           s->got_msgs_INIT);
 		printf("                got %8d messages of type NOP\n",            s->got_msgs_NOP);
+		*/
+		
 		printf("                delivered %8d boxes\n",			            s->boxes_delivered);
 		printf("                recharged %8d times\n",			            Robots.data[self-1].battery.times_recharged);
 		printf("                battery capacity loss %d%%\n", \
 								(int)( (1 - (float)Robots.data[self-1].battery.capacity / (float)BATTERY_CAPACITY) * 100 ));
 		
-		printf("                time spent charging   %d days\n", Robots.data[lp->gid - 1].battery.time_spent_charging / (2 * 3600 * 24)); // 1 tick == 0.5 sec
-		printf("                time spent uncharging %d days\n", (glb_time - Robots.data[lp->gid - 1].battery.time_spent_charging) / (2 * 3600 * 24));
+		printf("                time spent charging   %d days\n", Robots.data[lp->gid - 1].battery.time_spent_charging / (9000 * 24)); // 1 tick == 0.5 sec
+		printf("                time spent uncharging %d days\n", (glb_time - Robots.data[lp->gid - 1].battery.time_spent_charging) / (9000 * 24));
 		
 		if (Robots.data[self-1].battery.times_recharged != 0)
 		{
 			printf("                avg work time from 1 charge %d min\n", (glb_time - Robots.data[lp->gid - 1].battery.time_spent_charging)\
-																		/ Robots.data[self-1].battery.times_recharged / (2 * 60));
+																		/ Robots.data[self-1].battery.times_recharged / 150);
 			printf("                avg time on charge          %d min\n", Robots.data[lp->gid - 1].battery.time_spent_charging \
-																		/ Robots.data[self-1].battery.times_recharged / (2 * 60));
+																		/ Robots.data[self-1].battery.times_recharged / 150);
 		}
 	}
 }
