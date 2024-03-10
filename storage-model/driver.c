@@ -57,9 +57,9 @@ void model_init(state* s, tw_lp* lp)
 		
 		for (int i = 0; i < Robots.N; ++i)
 		{
-			RobotResponded[i] = FALSE;
-			InitBDM(&Robots.data[i], (i == 0)? LiFePO4: (i == 1)? LiNiMnCoO2: (i == 2)? LeadAcid: LiCoO2);
-			PrintBDM(&Robots.data[i], (i == 0)? "graph/LiFePO4.csv": (i == 1)? "graph/LiNiMnCoO2.csv": (i == 2)? "graph/LeadAcid.csv": "graph/LiCoO2.csv");
+			RobotResponded[i] = false;
+			InitBDM(&Robots.elem[i], (i == 0)? LiFePO4: (i == 1)? LiNiMnCoO2: (i == 2)? LeadAcid: LiCoO2);
+			//PrintBDM(&Robots.elem[i], (i == 0)? "graph/LiFePO4.csv": (i == 1)? "graph/LiNiMnCoO2.csv": (i == 2)? "graph/LeadAcid.csv": "graph/LiCoO2.csv");
 		}
 		
         printf("COMMAND_CENTER is initialized\n");
@@ -69,16 +69,24 @@ void model_init(state* s, tw_lp* lp)
         s->type = ROBOT;
         assert(lp->gid <= Robots.N);
 		
-		Robots.data[lp->gid - 1].state          	 		 = STOP;
-		Robots.data[lp->gid - 1].battery.charge   		     = BATTERY_CAPACITY;
-		Robots.data[lp->gid - 1].battery.capacity        	 = BATTERY_CAPACITY;
-		Robots.data[lp->gid - 1].battery.charging        	 = FALSE;
-		//Robots.data[lp->gid - 1].battery.dead        	 	 = FALSE;
-		Robots.data[lp->gid - 1].time_in_action  			 = 0; //no commands received, no actions performed
-		Robots.data[lp->gid - 1].battery.times_recharged 	 = 0;
-		Robots.data[lp->gid - 1].battery.time_spent_charging = 0;
+		Robots.elem[lp->gid - 1].state          	 		 = STOP;
+		Robots.elem[lp->gid - 1].battery.charge   		     = BATTERY_CAPACITY;
+		Robots.elem[lp->gid - 1].battery.capacity        	 = BATTERY_CAPACITY;
+		Robots.elem[lp->gid - 1].battery.charging        	 = false;
+		//Robots.elem[lp->gid - 1].battery.dead        	 	 = false;
+		Robots.elem[lp->gid - 1].time_in_action  			 = 0; //no commands received, no actions performed
+		Robots.elem[lp->gid - 1].battery.times_recharged 	 = 0;
+		Robots.elem[lp->gid - 1].battery.time_spent_charging = 0;
+		Robots.elem[lp->gid - 1].boxes_delivered 			 = 0;
+		Robots.elem[lp->gid - 1].stuck 						 = 0;
 		
-		AssignDest(&Robots.data[lp->gid - 1], CELL_BOX);
+		Robots.elem[lp->gid - 1].next_move_l 				 = false;
+		Robots.elem[lp->gid - 1].next_move_r 				 = false;
+		Robots.elem[lp->gid - 1].next_move_u 				 = false;
+		Robots.elem[lp->gid - 1].next_move_d 				 = false;
+		Robots.elem[lp->gid - 1].next_move_stall			 = false;
+		
+		AssignDest(&Robots.elem[lp->gid - 1], CELL_IN);
     
         printf("ROBOT #%ld is initialized\n", lp->gid);
     }
@@ -93,14 +101,12 @@ void model_init(state* s, tw_lp* lp)
 	s->got_msgs_MOVE_D   = 0;
 	s->got_msgs_MOVE_L   = 0;
 	s->got_msgs_MOVE_R   = 0;
-    s->got_msgs_BOX_GRAB = 0;
-    s->got_msgs_BOX_DROP = 0;
+    s->got_msgs_LOAD	 = 0;
+    s->got_msgs_UNLOAD 	 = 0;
     s->got_msgs_RECEIVED = 0;
     s->got_msgs_INIT     = 0;
 	s->got_msgs_NOP      = 0;
 	
-	s->boxes_delivered   = 0;
-
     if (lp->gid == 0)
 		for (int i = 1; i <= Robots.N; ++i)
 			SendMessage(i, lp, glb_time, INIT);
@@ -110,7 +116,7 @@ void model_init(state* s, tw_lp* lp)
 void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
 {
     int self = lp->gid;
-    bool is_executed = FALSE;
+    bool is_executed = false;
     // initialize the bit field
     *(int*)bf = (int)0;
 
@@ -130,7 +136,7 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
 					/*
 				case DEAD;
 					++s->got_msgs_DEAD;
-					BatteryDeath(&Robots.data[in_msg->sender - 1]);
+					BatteryDeath(&Robots.elem[in_msg->sender - 1]);
 					break;
 					*/
                 default:
@@ -141,25 +147,29 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
 				return;
 			
 			for (int i = 0; i < Robots.N; ++i)
-				if (Robots.data[i].battery.BDM_cur >= MAX_CYCLES_LiFePO4    && Robots.data[i].battery.type == LiFePO4 || \
-					Robots.data[i].battery.BDM_cur >= MAX_CYCLES_LiNiMnCoO2 && Robots.data[i].battery.type == LiNiMnCoO2 || \
-					Robots.data[i].battery.BDM_cur >= MAX_CYCLES_LeadAcid   && Robots.data[i].battery.type == LeadAcid || \
-					Robots.data[i].battery.BDM_cur >= MAX_CYCLES_LiCoO2     && Robots.data[i].battery.type == LiCoO2)
+				if (Robots.elem[i].battery.BDM_cur >= MAX_CYCLES_LiFePO4    && Robots.elem[i].battery.type == LiFePO4 || \
+					Robots.elem[i].battery.BDM_cur >= MAX_CYCLES_LiNiMnCoO2 && Robots.elem[i].battery.type == LiNiMnCoO2 || \
+					Robots.elem[i].battery.BDM_cur >= MAX_CYCLES_LeadAcid   && Robots.elem[i].battery.type == LeadAcid || \
+					Robots.elem[i].battery.BDM_cur >= MAX_CYCLES_LiCoO2     && Robots.elem[i].battery.type == LiCoO2)
 						return;
 
-			RobotResponded[in_msg->sender-1] = TRUE;
+
+			RobotResponded[in_msg->sender-1] = true;
 			if (EveryoneResponded(RobotResponded, Robots.N))
 			{
-				//PrintMap(path_to_log_folder);
+				//if (glb_time % 9000 == 0) // every hour
+				//	PrintNBoxesDelivered();
+				
+				PrintMap(path_to_log_folder);
 				glb_time += 1;
 				
 				for (int i = 0; i < Robots.N; ++i)
-					RobotResponded[i] = FALSE;
+					RobotResponded[i] = false;
 				
 				
 				for (int i = 1; i <= Robots.N; ++i)
 				{
-					message_type cmd = CalcNextMove2(&Robots.data[i-1]);
+					message_type cmd = CalcNextMove(&Robots.elem[i-1]);
 					SendMessage(i, lp, glb_time, cmd);
 				}
 			}
@@ -167,63 +177,69 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
 
         case ROBOT:
             {
-            struct _robot* This = &Robots.data[self-1];
-            //printf("Robot #%d: battery level is %d/%d\n", self, This->battery, This->capacity);
+            struct _robot* this = &Robots.elem[self-1];
+			
 			switch (in_msg->type)
             {
                 case ROTATE:
                     ++s->got_msgs_ROTATE;
-					if (This->time_in_action > 1) //busy
+					if (this->time_in_action > 1) //busy
 						break;
-					This->time_in_action = ROTATE_TIME;
+					this->time_in_action = ROTATE_TIME;
 					
-					if (This->state == MOTION)
-						This->battery.charge -= STOP_MOTION_COST;
-					This->state = STOP;
+					if (this->state == MOTION)
+						this->battery.charge -= STOP_MOTION_COST;
+					this->state = STOP;
 					
-					if (This->orientation == VER)
+					if (this->cur_ori == VER)
 					{
-						This->orientation = HOR;
-						storage.robots[This->y][This->x] = This->carries_box ? CELL_ROBOT_WITH_BOX_HOR : CELL_ROBOT_HOR;
+						this->cur_ori = HOR;
+						warehouse.robots[this->y][this->x] = this->loaded? CELL_FULL_ROBOT_HOR: CELL_EMPT_ROBOT_HOR;
 					}
 					else
 					{
-						This->orientation = VER;
-						storage.robots[This->y][This->x] = This->carries_box ? CELL_ROBOT_WITH_BOX_VER : CELL_ROBOT_VER;
+						this->cur_ori = VER;
+						warehouse.robots[this->y][this->x] = this->loaded? CELL_FULL_ROBOT_VER: CELL_EMPT_ROBOT_VER;
 					}
 					
-					This->battery.charge -= ROTATE_COST;
+					this->battery.charge -= ROTATE_COST;
                     break;
                 case MOVE_U:
                     ++s->got_msgs_MOVE_U;
-					if (This->time_in_action > 1)
+					if (this->time_in_action > 1)
 						break;
-					This->time_in_action = MOVE_TIME;
+					this->time_in_action = MOVE_TIME;
 					
-					assert(This->orientation == VER);
-					assert(This->y - 1 >= 0);
-                    switch(storage.room[This->y - 1][This->x])
+					assert(this->cur_ori == VER);
+					assert(this->y - 1 >= 0);
+                    switch(warehouse.room[this->y - 1][this->x])
                     {
                         case CELL_EMPTY:
-						case CELL_BOX:
-						case CELL_CONTAINER:
+						case CELL_IN:
+						case CELL_OUT:
 						case CELL_CHARGER:
-							if (storage.robots[This->y - 1][This->x] == CELL_EMPTY)
+							if (warehouse.robots[this->y - 1][this->x] == CELL_EMPTY)
 							{
-								storage.robots[This->y - 1][This->x] = This->carries_box ? CELL_ROBOT_WITH_BOX_VER : CELL_ROBOT_VER;
-								storage.robots[This->y    ][This->x] = CELL_EMPTY;
-								This->y = This->y - 1;
+								warehouse.robots[this->y - 1][this->x] = this->loaded? CELL_FULL_ROBOT_VER: CELL_EMPT_ROBOT_VER;
+								warehouse.robots[this->y    ][this->x] = CELL_EMPTY;
+								this->y = this->y - 1;
 								
-								if 		(This->state == MOTION)
-									This->battery.charge -= KEEP_MOTION_COST;
-								else if (This->state == STOP)
-									This->battery.charge -= START_MOTION_COST;
+								if 		(this->state == MOTION)
+									this->battery.charge -= KEEP_MOTION_COST;
+								else if (this->state == STOP)
+									this->battery.charge -= START_MOTION_COST;
 								
-								This->state = MOTION;
+								this->state = MOTION;
+								this->stuck = 0;
 							}
-                            break;
+							else //the way is blocked by another robot
+							{
+								++this->stuck;
+								printf("MOVE_U: incrementing this->stuck...\n");
+							}
+							break;
                         case CELL_WALL:
-							This->state = STOP;
+							this->state = STOP;
 							break;
                         default:
                             break;
@@ -231,34 +247,40 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
                     break;
 				case MOVE_D:
                     ++s->got_msgs_MOVE_D;
-					if (This->time_in_action > 1)
+					if (this->time_in_action > 1)
 						break;
-					This->time_in_action = MOVE_TIME;
+					this->time_in_action = MOVE_TIME;
 					
-					assert(This->orientation == VER);
-					assert(This->y + 1 < storage.height);
-                    switch(storage.room[This->y + 1][This->x])
+					assert(this->cur_ori == VER);
+					assert(this->y + 1 < warehouse.size_y);
+                    switch(warehouse.room[this->y + 1][this->x])
                     {
                         case CELL_EMPTY:
-						case CELL_BOX:
-						case CELL_CONTAINER:
+						case CELL_IN:
+						case CELL_OUT:
 						case CELL_CHARGER:
-							if (storage.robots[This->y + 1][This->x] == CELL_EMPTY)
+							if (warehouse.robots[this->y + 1][this->x] == CELL_EMPTY)
 							{
-								storage.robots[This->y + 1][This->x] = This->carries_box ? CELL_ROBOT_WITH_BOX_VER : CELL_ROBOT_VER;
-								storage.robots[This->y    ][This->x] = CELL_EMPTY;
-								This->y = This->y + 1;
+								warehouse.robots[this->y + 1][this->x] = this->loaded? CELL_FULL_ROBOT_VER: CELL_EMPT_ROBOT_VER;
+								warehouse.robots[this->y    ][this->x] = CELL_EMPTY;
+								this->y = this->y + 1;
 								
-								if 		(This->state == MOTION)
-									This->battery.charge -= KEEP_MOTION_COST;
-								else if (This->state == STOP)
-									This->battery.charge -= START_MOTION_COST;
+								if 		(this->state == MOTION)
+									this->battery.charge -= KEEP_MOTION_COST;
+								else if (this->state == STOP)
+									this->battery.charge -= START_MOTION_COST;
 								
-								This->state = MOTION;
+								this->state = MOTION;
+								this->stuck = 0;
+							}
+							else //the way is blocked by another robot
+							{
+								++this->stuck;
+								printf("MOVE_D: incrementing this->stuck...\n");
 							}
                             break;
                         case CELL_WALL:
-							This->state = STOP;
+							this->state = STOP;
 							break;
                         default:
                             break;
@@ -266,34 +288,40 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
                     break;
 				case MOVE_L:
                     ++s->got_msgs_MOVE_L;
-					if (This->time_in_action > 1)
+					if (this->time_in_action > 1)
 						break;
-					This->time_in_action = MOVE_TIME;
+					this->time_in_action = MOVE_TIME;
 					
-					assert(This->orientation == HOR);
-					assert(This->x - 1 >= 0);
-                    switch(storage.room[This->y][This->x - 1])
+					assert(this->cur_ori == HOR);
+					assert(this->x - 1 >= 0);
+                    switch(warehouse.room[this->y][this->x - 1])
                     {
                         case CELL_EMPTY:
-						case CELL_BOX:
-						case CELL_CONTAINER:
+						case CELL_IN:
+						case CELL_OUT:
 						case CELL_CHARGER:
-							if (storage.robots[This->y][This->x - 1] == CELL_EMPTY)
+							if (warehouse.robots[this->y][this->x - 1] == CELL_EMPTY)
 							{
-								storage.robots[This->y][This->x - 1] = This->carries_box ? CELL_ROBOT_WITH_BOX_HOR : CELL_ROBOT_HOR;
-								storage.robots[This->y][This->x    ] = CELL_EMPTY;
-								This->x = This->x - 1;
+								warehouse.robots[this->y][this->x - 1] = this->loaded? CELL_FULL_ROBOT_HOR: CELL_EMPT_ROBOT_HOR;
+								warehouse.robots[this->y][this->x    ] = CELL_EMPTY;
+								this->x = this->x - 1;
 								
-								if 		(This->state == MOTION)
-									This->battery.charge -= KEEP_MOTION_COST;
-								else if (This->state == STOP)
-									This->battery.charge -= START_MOTION_COST;
+								if 		(this->state == MOTION)
+									this->battery.charge -= KEEP_MOTION_COST;
+								else if (this->state == STOP)
+									this->battery.charge -= START_MOTION_COST;
 								
-								This->state = MOTION;
+								this->state = MOTION;
+								this->stuck = 0;
+							}
+							else //the way is blocked by another robot
+							{
+								++this->stuck;
+								printf("MOVE_L: incrementing this->stuck...\n");
 							}
                             break;
                         case CELL_WALL:
-							This->state = STOP;
+							this->state = STOP;
 							break;
                         default:
                             break;
@@ -301,85 +329,91 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
                     break;
 				case MOVE_R:
                     ++s->got_msgs_MOVE_R;
-					if (This->time_in_action > 1)
+					if (this->time_in_action > 1)
 						break;
-					This->time_in_action = MOVE_TIME;
+					this->time_in_action = MOVE_TIME;
 					
-					assert(This->orientation == HOR);
-					assert(This->x + 1 < storage.length);
-                    switch(storage.room[This->y][This->x + 1])
+					assert(this->cur_ori == HOR);
+					//printf("this->x = %d, warehouse.size_x = %d\n", this->x, warehouse.size_x);
+					assert(this->x + 1 < warehouse.size_x);
+                    switch(warehouse.room[this->y][this->x + 1])
                     {
                         case CELL_EMPTY:
-						case CELL_BOX:
-						case CELL_CONTAINER:
+						case CELL_IN:
+						case CELL_OUT:
 						case CELL_CHARGER:
-							if (storage.robots[This->y][This->x + 1] == CELL_EMPTY)
+							if (warehouse.robots[this->y][this->x + 1] == CELL_EMPTY)
 							{
-								storage.robots[This->y][This->x + 1] = This->carries_box ? CELL_ROBOT_WITH_BOX_HOR : CELL_ROBOT_HOR;
-								storage.robots[This->y][This->x]     = CELL_EMPTY;
-								This->x = This->x + 1;
+								warehouse.robots[this->y][this->x + 1] = this->loaded? CELL_FULL_ROBOT_HOR: CELL_EMPT_ROBOT_HOR;
+								warehouse.robots[this->y][this->x]     = CELL_EMPTY;
+								this->x = this->x + 1;
 								
-								if 		(This->state == MOTION)
-									This->battery.charge -= KEEP_MOTION_COST;
-								else if (This->state == STOP)
-									This->battery.charge -= START_MOTION_COST;
+								if 		(this->state == MOTION)
+									this->battery.charge -= KEEP_MOTION_COST;
+								else if (this->state == STOP)
+									this->battery.charge -= START_MOTION_COST;
 								
-								This->state = MOTION;
+								this->state = MOTION;
+								this->stuck = 0;
+							}
+							else //the way is blocked by another robot
+							{
+								++this->stuck;
+								printf("MOVE_R: incrementing this->stuck...\n");
 							}
                             break;
                         case CELL_WALL:
-							This->state = STOP;
+							this->state = STOP;
 							break;
                         default:
                             break;
                     }
                     break;
-                case BOX_GRAB:
-                    ++s->got_msgs_BOX_GRAB;
-					if (This->time_in_action > 1)
+                case LOAD:
+                    ++s->got_msgs_LOAD;
+					if (this->time_in_action > 1)
 						break;
-					This->time_in_action = BOX_GRAB_TIME;
+					this->time_in_action = LOAD_TIME;
 					
-					if (This->state == MOTION)
-						This->battery.charge -= STOP_MOTION_COST;
-					This->state = STOP;
+					if (this->state == MOTION)
+						this->battery.charge -= STOP_MOTION_COST;
+					this->state = STOP;
 					
-                    if (storage.room[This->y][This->x] == CELL_BOX && This->carries_box == FALSE)
+                    if (warehouse.room[this->y][this->x] == CELL_IN && this->loaded == false)
                     {
-                        This->carries_box = TRUE;
-						if (This->orientation == VER)
-							storage.robots[This->y][This->x] = CELL_ROBOT_WITH_BOX_VER;
+                        this->loaded = true;
+						if (this->cur_ori == VER)
+							warehouse.robots[this->y][this->x] = CELL_FULL_ROBOT_VER;
 						else
-							storage.robots[This->y][This->x] = CELL_ROBOT_WITH_BOX_HOR;
-                        //printf("ROBOT #%d: grab the box.\n", self);
-						AssignDest(&Robots.data[self-1], CELL_CONTAINER);
+							warehouse.robots[this->y][this->x] = CELL_FULL_ROBOT_HOR;
+						
+						AssignDest(&Robots.elem[self-1], CELL_OUT);
                     }
                     break;
-                case BOX_DROP:
-                    ++s->got_msgs_BOX_DROP;
-					if (This->time_in_action > 1)
+                case UNLOAD:
+                    ++s->got_msgs_UNLOAD;
+					if (this->time_in_action > 1)
 						break;
-					This->time_in_action = BOX_DROP_TIME;
+					this->time_in_action = UNLOAD_TIME;
 					
-					if (This->state == MOTION)
-						This->battery.charge -= STOP_MOTION_COST;
-					This->state = STOP;
+					if (this->state == MOTION)
+						this->battery.charge -= STOP_MOTION_COST;
+					this->state = STOP;
 					
-                    if (storage.room[This->y][This->x] == CELL_CONTAINER && This->carries_box == TRUE)
+                    if (warehouse.room[this->y][this->x] == CELL_OUT && this->loaded == true)
                     {
-                        This->carries_box = FALSE;
-						if (This->orientation == VER)
-							storage.robots[This->y][This->x] = CELL_ROBOT_VER;
+                        this->loaded = false;
+						if (this->cur_ori == VER)
+							warehouse.robots[this->y][this->x] = CELL_EMPT_ROBOT_VER;
 						else
-							storage.robots[This->y][This->x] = CELL_ROBOT_HOR;
+							warehouse.robots[this->y][this->x] = CELL_EMPT_ROBOT_HOR;
                         
-						//printf("ROBOT #%d: drop the box.\n", self);
-						++s->boxes_delivered;
+						++this->boxes_delivered;
 						
-						if (Robots.data[self-1].battery.charge < TIME_TO_CHARGE_THRESHOLD)
-							AssignDest(&Robots.data[self-1], CELL_CHARGER);
-						else
-							AssignDest(&Robots.data[self-1], CELL_BOX);
+						//if (Robots.elem[self-1].battery.charge < TIME_TO_CHARGE_THRESHOLD)
+						//	AssignDest(&Robots.elem[self-1], CELL_CHARGER);
+						//else
+							AssignDest(&Robots.elem[self-1], CELL_IN);
                     }
                     break;
 				case INIT:
@@ -387,9 +421,9 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
 					break;
 				case NOP:
 					++s->got_msgs_NOP;
-					if (This->state == MOTION)
-						This->battery.charge -= STOP_MOTION_COST;
-					This->state = STOP;
+					if (this->state == MOTION)
+						this->battery.charge -= STOP_MOTION_COST;
+					this->state = STOP;
 					break;
                 default:
                     printf("ROBOT #%d: Unhandled forward message of type %d\n", self, in_msg->type);
@@ -422,8 +456,8 @@ void model_final(state* s, tw_lp* lp)
 	}
 	else if (s->type == ROBOT)
 	{
-		printf("\nROBOT #%d (battery %d/%d) ", self, Robots.data[self-1].battery.charge, Robots.data[self-1].battery.capacity);
-		switch(Robots.data[self-1].battery.type)
+		printf("\nROBOT #%d (battery %d/%d) ", self, Robots.elem[self-1].battery.charge, Robots.elem[self-1].battery.capacity);
+		switch(Robots.elem[self-1].battery.type)
 		{
 			case LiFePO4:
 				printf("LiFePO4:\n\n");
@@ -448,26 +482,26 @@ void model_final(state* s, tw_lp* lp)
 		printf("                got %8d messages of type MOVE_D\n",         s->got_msgs_MOVE_D);
 		printf("                got %8d messages of type MOVE_L\n",         s->got_msgs_MOVE_L);
 		printf("                got %8d messages of type MOVE_R\n",         s->got_msgs_MOVE_R);
-		printf("                got %8d messages of type BOX_GRAB\n",       s->got_msgs_BOX_GRAB);
-		printf("                got %8d messages of type BOX_DROP\n",       s->got_msgs_BOX_DROP);
+		printf("                got %8d messages of type LOAD\n",       s->got_msgs_LOAD);
+		printf("                got %8d messages of type UNLOAD\n",       s->got_msgs_UNLOAD);
 		printf("                got %8d messages of type INIT\n",           s->got_msgs_INIT);
 		printf("                got %8d messages of type NOP\n",            s->got_msgs_NOP);
 		*/
 		
-		printf("                delivered %8d boxes\n",			            s->boxes_delivered);
-		printf("                recharged %8d times\n",			            Robots.data[self-1].battery.times_recharged);
+		printf("                delivered %8d boxes\n",			            Robots.elem[self-1].boxes_delivered);
+		printf("                recharged %8d times\n",			            Robots.elem[self-1].battery.times_recharged);
 		printf("                battery capacity loss %d%%\n", \
-								(int)( (1 - (float)Robots.data[self-1].battery.capacity / (float)BATTERY_CAPACITY) * 100 ));
+								(int)( (1 - (float)Robots.elem[self-1].battery.capacity / (float)BATTERY_CAPACITY) * 100 ));
 		
-		printf("                time spent charging   %d days\n", Robots.data[lp->gid - 1].battery.time_spent_charging / (9000 * 24)); // 1 tick == 0.5 sec
-		printf("                time spent uncharging %d days\n", (glb_time - Robots.data[lp->gid - 1].battery.time_spent_charging) / (9000 * 24));
+		printf("                time spent charging   %d days\n", Robots.elem[lp->gid - 1].battery.time_spent_charging / (9000 * 24)); // 1 tick == 0.5 sec
+		printf("                time spent uncharging %d days\n", (glb_time - Robots.elem[lp->gid - 1].battery.time_spent_charging) / (9000 * 24));
 		
-		if (Robots.data[self-1].battery.times_recharged != 0)
+		if (Robots.elem[self-1].battery.times_recharged != 0)
 		{
-			printf("                avg work time from 1 charge %d min\n", (glb_time - Robots.data[lp->gid - 1].battery.time_spent_charging)\
-																		/ Robots.data[self-1].battery.times_recharged / 150);
-			printf("                avg time on charge          %d min\n", Robots.data[lp->gid - 1].battery.time_spent_charging \
-																		/ Robots.data[self-1].battery.times_recharged / 150);
+			printf("                avg work time from 1 charge %d min\n", (glb_time - Robots.elem[lp->gid - 1].battery.time_spent_charging)\
+																		/ Robots.elem[self-1].battery.times_recharged / 150);
+			printf("                avg time on charge          %d min\n", Robots.elem[lp->gid - 1].battery.time_spent_charging \
+																		/ Robots.elem[self-1].battery.times_recharged / 150);
 		}
 	}
 }

@@ -27,8 +27,8 @@ SET(model_srcs
 
 # Set the executable name here: model
 # You will be executing the ./model binary
-ADD_EXECUTABLE(start ${model_srcs})
+ADD_EXECUTABLE(run ${model_srcs})
 
-TARGET_LINK_LIBRARIES(start ROSS m)
+TARGET_LINK_LIBRARIES(run ROSS m)
 ## Alternatively, use this command with RIO
 #TARGET_LINK_LIBRARIES(start ROSS RIO m)

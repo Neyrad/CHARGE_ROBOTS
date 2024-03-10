@@ -22,10 +22,10 @@ void PrintMap(const char* log_folder_path)
     //printf("path = %s\n", path);
 
     FILE* f = fopen(path, "w");
-    for (int y = 0; y < storage.height; ++y) {
-        for (int x = 0; x < storage.length; ++x) {
-            fprintf(f, "%d", storage.robots[y][x]);
-            if (x < storage.length - 1)
+    for (int y = 0; y < warehouse.size_y; ++y) {
+        for (int x = 0; x < warehouse.size_x; ++x) {
+            fprintf(f, "%d", warehouse.robots[y][x]);
+            if (x < warehouse.size_x - 1)
 				fprintf(f, ","); //no comma at the end of a line
         }
         fprintf(f, "\n");
@@ -39,7 +39,7 @@ void PrintPairs()
 	{
         for (int x = 0; x < 2; ++x)
 		{
-            printf("%d", pairs.data[y][x]);
+            printf("%d", pairs.elem[y][x]);
             if (x == 0)
 				printf(","); //no comma at the end of a line
         }
@@ -57,13 +57,13 @@ void PrintNSteps(const char* log_folder_path)
 }
 
 //Converts a CSV file to a 2D int array
-void Parse(const char* path, int arr[MAX_ROOM_HEIGHT][MAX_ROOM_LENGTH])
+void Parse(const char* path, int arr[MAX_ROOM_SIZE_Y][MAX_ROOM_SIZE_X])
 {
     struct stat stats;
     stat(path, &stats);
     FILE* f = fopen(path, "r");
     assert(f); //to check correctness of the path
-    char buf[MAX_ROOM_HEIGHT * MAX_ROOM_LENGTH * 2 + MAX_COMMENT_LENGTH]; // * 2 for commas
+    char buf[MAX_ROOM_SIZE_Y * MAX_ROOM_SIZE_X * 2 + MAX_COMMENT_LENGTH]; // * 2 for commas
     fread(buf, sizeof(buf[0]), stats.st_size, f);
     fclose(f);
 
@@ -74,22 +74,22 @@ void Parse(const char* path, int arr[MAX_ROOM_HEIGHT][MAX_ROOM_LENGTH])
         ++start_index; //next symbol after #bla-bla-bla\n
     }
     
-    storage.height = 0;
+    warehouse.size_y = 0;
     int x = 0;
     for (int i = start_index; i < stats.st_size; ++i) {
         if (buf[i] == '\n') {
-            ++storage.height;
-            storage.length = x;
+            ++warehouse.size_y;
+            warehouse.size_x = x;
             x = 0;
             continue;
         }
         if (isdigit(buf[i])) {
-            if ((i < stats.st_size) && isdigit(buf[i+1])) {  //processing 2-digit numbers
-                arr[storage.height][x] = (buf[i] - '0') * 10 + (buf[i+1] - '0');
+            if ((i + 1 < stats.st_size) && isdigit(buf[i+1])) {  //processing 2-digit numbers
+                arr[warehouse.size_y][x] = (buf[i] - '0') * 10 + (buf[i+1] - '0');
                 ++i;
             }
             else {
-                arr[storage.height][x] = buf[i] - '0';
+                arr[warehouse.size_y][x] = buf[i] - '0';
             }
             ++x;
         }
@@ -98,9 +98,9 @@ void Parse(const char* path, int arr[MAX_ROOM_HEIGHT][MAX_ROOM_LENGTH])
 
 void PairsInit(const char* path)
 {
-	pairs.data = calloc(MAX_INPUT_LENGTH, sizeof(int*));
+	pairs.elem = calloc(MAX_INPUT_LENGTH, sizeof(int*));
 	for (size_t i = 0; i < MAX_INPUT_LENGTH; ++i)
-		pairs.data[i] = calloc(2, sizeof(int));
+		pairs.elem[i] = calloc(2, sizeof(int));
 
     struct stat stats;
     stat(path, &stats);
@@ -123,45 +123,45 @@ void PairsInit(const char* path)
         }
         if (isdigit(buf[i]))
 		{
-            pairs.data[pairs.length][x] = buf[i] - '0';
+            pairs.elem[pairs.length][x] = buf[i] - '0';
             ++x;
         }
     }
 	pairs.cur = 0;
-	pairs.eof = FALSE;
+	pairs.eof = false;
 }
 
 void FreePairs()
 {	
 	for (size_t i = 0; i < MAX_INPUT_LENGTH; ++i)
-		free(pairs.data[i]);
-	free(pairs.data);
+		free(pairs.elem[i]);
+	free(pairs.elem);
 }
 
 void RobotsInit()
 {
     Robots.N = 0;
-    for (int y = 0; y < storage.height; ++y)
-        for (int x = 0; x < storage.length; ++x)
-            if (storage.robots[y][x] == CELL_ROBOT_VER   		|| \
-                storage.robots[y][x] == CELL_ROBOT_HOR   		|| \
-				storage.robots[y][x] == CELL_ROBOT_WITH_BOX_VER || \
-                storage.robots[y][x] == CELL_ROBOT_WITH_BOX_HOR) 
+    for (int y = 0; y < warehouse.size_y; ++y)
+        for (int x = 0; x < warehouse.size_x; ++x)
+            if (warehouse.robots[y][x] == CELL_EMPT_ROBOT_VER   		|| \
+                warehouse.robots[y][x] == CELL_EMPT_ROBOT_HOR   		|| \
+				warehouse.robots[y][x] == CELL_FULL_ROBOT_VER || \
+                warehouse.robots[y][x] == CELL_FULL_ROBOT_HOR) 
 			{
-				if (storage.robots[y][x] == CELL_ROBOT_VER || \
-					storage.robots[y][x] == CELL_ROBOT_HOR)
-					Robots.data[Robots.N].carries_box = FALSE;
+				if (warehouse.robots[y][x] == CELL_EMPT_ROBOT_VER || \
+					warehouse.robots[y][x] == CELL_EMPT_ROBOT_HOR)
+					Robots.elem[Robots.N].loaded = false;
 				else
-					Robots.data[Robots.N].carries_box = TRUE;
+					Robots.elem[Robots.N].loaded = true;
 				
-                Robots.data[Robots.N].x = x;
-                Robots.data[Robots.N].y = y;
+                Robots.elem[Robots.N].x = x;
+                Robots.elem[Robots.N].y = y;
                 
-                if (storage.robots[y][x] == CELL_ROBOT_VER || \
-				    storage.robots[y][x] == CELL_ROBOT_WITH_BOX_VER)
-				    Robots.data[Robots.N].orientation = VER;
+                if (warehouse.robots[y][x] == CELL_EMPT_ROBOT_VER || \
+				    warehouse.robots[y][x] == CELL_FULL_ROBOT_VER)
+				    Robots.elem[Robots.N].cur_ori = VER;
 				else
-					Robots.data[Robots.N].orientation = HOR;
+					Robots.elem[Robots.N].cur_ori = HOR;
 
                 ++Robots.N;
                 assert(Robots.N <= MAX_ROBOTS);
@@ -174,8 +174,8 @@ void RobotsPrint()
     for (int i = 0; i < Robots.N; ++i)
 	{
         printf("Robot #%d is located at (%d, %d) ", \
-                      i+1, Robots.data[i].x, Robots.data[i].y);
-        if (Robots.data[i].orientation == VER)
+                      i+1, Robots.elem[i].x, Robots.elem[i].y);
+        if (Robots.elem[i].cur_ori == VER)
 			printf("VER\n");
 		else
 			printf("HOR\n");
@@ -206,284 +206,229 @@ bool EveryoneResponded(int* arr, int N)
 	return cnt == N;
 }
 
-void AssignDest(struct _robot* robot, int goal)
-{
-	if      (goal == CELL_BOX)
-	{
+void AssignDest(struct _robot* robot, CELL goal_cell)
+{	
+	if      (goal_cell == CELL_IN)
 		GetPair(robot);
-		switch(robot->pair[0])
-		{
-			case 1:
-				{
-				struct cell dest_cell = {2, 7, CELL_BOX}; // {x, y, value}
-				robot->dest = dest_cell;
-				robot->dest_ori = VER;
-				}
-				return;
-			case 2:
-				{
-				struct cell dest_cell = {4, 7, CELL_BOX};
-				robot->dest = dest_cell;
-				robot->dest_ori = VER;
-				}
-				return;
-			case 3:
-				{
-				struct cell dest_cell = {6, 7, CELL_BOX};
-				robot->dest = dest_cell;
-				robot->dest_ori = VER;
-				}
-				return;
-			default:
-				printf("AssignDest(): poor RNG\n");
-				return;
-		}
-	}
-	else if (goal == CELL_CONTAINER)
-	{
-		switch(robot->pair[1])
-		{
-			case 1:
-				{
-				struct cell dest_cell = {0, 6, CELL_CONTAINER};
-				robot->dest = dest_cell;
-				robot->dest_ori = HOR;
-				}
-				return;
-			case 2:
-				{
-				struct cell dest_cell = {0, 4, CELL_CONTAINER};
-				robot->dest = dest_cell;
-				robot->dest_ori = HOR;
-				}
-				return;
-			case 3:
-				{
-				struct cell dest_cell = {0, 2, CELL_CONTAINER};
-				robot->dest = dest_cell;
-				robot->dest_ori = HOR;
-				}
-				return;
-			case 4:
-				{
-				struct cell dest_cell = {2, 0, CELL_CONTAINER};
-				robot->dest = dest_cell;
-				robot->dest_ori = VER;
-				}
-				return;
-			case 5:
-				{
-				struct cell dest_cell = {4, 0, CELL_CONTAINER};
-				robot->dest = dest_cell;
-				robot->dest_ori = VER;
-				}
-				return;
-			case 6:
-				{
-				struct cell dest_cell = {6, 0, CELL_CONTAINER};
-				robot->dest = dest_cell;
-				robot->dest_ori = VER;
-				}
-				return;
-			case 7:
-				{
-				struct cell dest_cell = {8, 6, CELL_CONTAINER};
-				robot->dest = dest_cell;
-				robot->dest_ori = HOR;
-				}
-				return;
-			case 8:
-				{
-				struct cell dest_cell = {8, 4, CELL_CONTAINER};
-				robot->dest = dest_cell;
-				robot->dest_ori = HOR;
-				}
-				return;
-			case 9:
-				{
-				struct cell dest_cell = {8, 2, CELL_CONTAINER};
-				robot->dest = dest_cell;
-				robot->dest_ori = HOR;
-				}
-				return;
-			default:
-				printf("AssignDest(): poor RNG\n");
-				return;
-		}
-	}
-	
-	else if (goal == CELL_CHARGER)
-	{
+		
+	//else if (goal == CELL_CHARGER)
 		//choose the closest free charger
-		if (robot->y == 0)
-		{
-			struct cell dest_cell = {8, 0, CELL_CHARGER};
-			robot->dest = dest_cell;
-			robot->dest_ori = VER;
-		}	
-		else
-		{
-			struct cell dest_cell = {0, 0, CELL_CHARGER};
-			robot->dest = dest_cell;
-			robot->dest_ori = VER;
-		}
-	}
+	
+	robot->goal_cell = goal_cell;
 }
 
 int CalcNextMove(struct _robot* robot)
 {
-	int dist_X = robot->dest.x - robot->x;
-	int dist_Y = robot->dest.y - robot->y;
-	
-	if (dist_Y != 0)
-	{
-		if (robot->orientation == HOR)
-			return ROTATE;
-		
-		if (dist_Y > 0)
-			return MOVE_D;
-		else
-			return MOVE_U;
-	}
-	
-	if (dist_X != 0)
-	{
-		if (robot->orientation == VER)
-			return ROTATE;
-		
-		if (dist_X > 0)
-			return MOVE_R;
-		else
-			return MOVE_L;
-	}
-	
-	if (robot->orientation != robot->dest_ori)
-		return ROTATE;
-	
-	return robot->dest.value == CELL_BOX ? BOX_GRAB : BOX_DROP;
-}
-
-
-int CalcNextMove2(struct _robot* robot)
-{
-	if (robot->battery.charge <= 0)
-	{
-		printf("CalcNextMove2(): robot->battery.charge == %d\n", robot->battery.charge);
-		//BatteryDeath();
-		//return DEAD; //battery is dead
-	}//assert(robot->battery.charge > 0); //make sure energy costs in model.h are not too high
-	assert(robot->battery.charge <= robot->battery.capacity);
-	
-	
 	if (robot->time_in_action > 1) //current action not finished
 	{
 		robot->time_in_action -= 1;
 		return NOP;
 	}
 	
-	
-	if (robot->battery.charging)
+	if (robot->stuck > 0)
 	{
-		if (robot->battery.charge < robot->battery.capacity)
+		printf("robot->stuck > 0(): Hello World!, robot->stuck = %d\n", robot->stuck);
+		int local_stuck_limit = rand() % MOVES_STUCK_LIMIT + MOVES_STUCK_LIMIT; 
+		if (robot->stuck > local_stuck_limit)
 		{
-			robot->battery.charge += CHARGE_CHUNK;
-			if (robot->battery.charge > robot->battery.capacity)
-				robot->battery.charge = robot->battery.capacity;
-			robot->battery.time_spent_charging += 1;
-			return NOP;
+			printf("robot->stuck > local_stuck_limit(): Hello World!\n");
+			robot->stuck = 0;
+			return UnstuckMoveSequence(robot);
 		}
-		
-		else //fully charged
-		{
-			if 		(robot->x == 0)  //left charger
-			{
-				if (robot->orientation == HOR)
-				{
-					robot->battery.times_recharged += 1;
-					robot->battery.capacity 		= CalculateCapacity(robot);
-					robot->battery.charge  			= robot->battery.capacity;
-					robot->battery.charging 		= FALSE;
-					AssignDest(robot, CELL_BOX);
-					return MOVE_R;
-				}
-				else
-					return ROTATE;
-			}	
+	}
+
+	if (robot->next_move_l)
+	{
+		robot->next_move_l = false;
+		assert(robot->cur_ori == HOR);
+		robot->next_move_stall = true;
+		return MOVE_L;
+	}
+	if (robot->next_move_r)
+	{
+		robot->next_move_r = false;
+		assert(robot->cur_ori == HOR);
+		robot->next_move_stall = true;
+		return MOVE_R;
+	}
+	if (robot->next_move_u)
+	{
+		robot->next_move_u = false;
+		assert(robot->cur_ori == VER);
+		robot->next_move_stall = true;
+		return MOVE_U;
+	}
+	if (robot->next_move_d)
+	{
+		robot->next_move_d = false;
+		assert(robot->cur_ori == VER);
+		robot->next_move_stall = true;
+		return MOVE_D;
+	}
+	if (robot->next_move_stall)
+	{
+		robot->time_in_action = STALL_TIME;
+		robot->next_move_stall = false;
+		return NOP;
+	}
+
+	switch (robot->goal_cell)
+	{
+		case CELL_IN:
+			if (robot->x == ins.elem[robot->in_num].x && \
+				robot->y == ins.elem[robot->in_num].y)
+				return robot->cur_ori == robot->dest_ori? LOAD: ROTATE;
+			else
+			{	
+				struct square cur   = {robot->x	   , robot->y	 };
 				
-			else if (robot->x == 8)	//right charger
-			{
-				if (robot->orientation == VER)
-				{
-					robot->battery.times_recharged += 1;
-					robot->battery.capacity 		= CalculateCapacity(robot);
-					robot->battery.charge  			= robot->battery.capacity;
-					robot->battery.charging 		= FALSE;
-					AssignDest(robot, CELL_BOX);
-					return MOVE_D;
-				}
-				else
-					return ROTATE;
+				struct square left  = {robot->x - 1, robot->y	 };
+				struct square right = {robot->x + 1, robot->y	 };
+				struct square up    = {robot->x	   , robot->y - 1};
+				struct square down  = {robot->x	   , robot->y + 1};
+				
+				
+				int value 	= in_maps[robot->in_num].elem[cur.y][cur.x];
+				
+				int value_l = (Valid(left) &&  Empty(left))?  in_maps[robot->in_num].elem[left.y][left.x]:   BIG_NUMBER;
+				int value_r = (Valid(right)&&  Empty(right))? in_maps[robot->in_num].elem[right.y][right.x]: BIG_NUMBER;
+				int value_u = (Valid(up)   &&  Empty(up))? 	  in_maps[robot->in_num].elem[up.y][up.x]:   	 BIG_NUMBER;
+				int value_d = (Valid(down) &&  Empty(down))?  in_maps[robot->in_num].elem[down.y][down.x]:   BIG_NUMBER;
+				
+				//printf("robot->in_num = %d, robot->out_num = %d\n", robot->in_num, robot->out_num);
+				//printf("value = %d, value_l = %d, value_r = %d, value_u = %d, value_d = %d\n", \
+						value,	    value_l, 	  value_r, 	    value_u, 	  value_d);
+				
+				if (value_l < value)
+					return robot->cur_ori == HOR? MOVE_L: ROTATE;
+				
+				if (value_r < value)
+					return robot->cur_ori == HOR? MOVE_R: ROTATE;
+				
+				if (value_u < value)
+					return robot->cur_ori == VER? MOVE_U: ROTATE;
+				
+				if (value_d < value)
+					return robot->cur_ori == VER? MOVE_D: ROTATE;
 			}
-		}
-	}
-	
-	if (robot->dest.x == robot->x && robot->dest.y == robot->y)
-	{
-		if (robot->orientation == robot->dest_ori)
-		{
-			switch(robot->dest.value)
-			{
-				case CELL_BOX:
-					return BOX_GRAB;
-				case CELL_CONTAINER:
-					return BOX_DROP;
-				case CELL_CHARGER:
-					robot->battery.charging = TRUE;
-					return NOP;
+			break;
+			
+		case CELL_OUT:
+			if (robot->x == outs.elem[robot->out_num].x && \
+				robot->y == outs.elem[robot->out_num].y)
+				return robot->cur_ori == robot->dest_ori? UNLOAD: ROTATE;
+			else
+			{				
+				struct square cur   = {robot->x	   , robot->y	 };
+				
+				struct square left  = {robot->x - 1, robot->y	 };
+				struct square right = {robot->x + 1, robot->y	 };
+				struct square up    = {robot->x	   , robot->y - 1};
+				struct square down  = {robot->x	   , robot->y + 1};
+				
+				
+				int value 	= out_maps[robot->out_num].elem[cur.y][cur.x];
+				
+				int value_l = (Valid(left) &&  Empty(left))?  out_maps[robot->out_num].elem[left.y][left.x]:   BIG_NUMBER;
+				int value_r = (Valid(right)&&  Empty(right))? out_maps[robot->out_num].elem[right.y][right.x]: BIG_NUMBER;
+				int value_u = (Valid(up)   &&  Empty(up))? 	  out_maps[robot->out_num].elem[up.y][up.x]: 	   BIG_NUMBER;
+				int value_d = (Valid(down) &&  Empty(down))?  out_maps[robot->out_num].elem[down.y][down.x]:   BIG_NUMBER;
+				
+				if (value_l < value)
+					return robot->cur_ori == HOR? MOVE_L: ROTATE;
+				
+				if (value_r < value)
+					return robot->cur_ori == HOR? MOVE_R: ROTATE;
+				
+				if (value_u < value)
+					return robot->cur_ori == VER? MOVE_U: ROTATE;
+				
+				if (value_d < value)
+					return robot->cur_ori == VER? MOVE_D: ROTATE;
 			}
-		}
-		
-		else
-			return ROTATE;
+			break;
+			
+		case CELL_CHARGER:
+			robot->battery.charging = true;
+			return NOP;
 	}
-	
-	if (robot->y == 0 && robot->x != 8)
-		if (robot->x == 7 && robot->dest.value != CELL_CHARGER)
-			return robot->orientation == VER ? MOVE_D : ROTATE;
-		else
-			return robot->orientation == HOR ? MOVE_R : ROTATE;
-		
-	if (robot->y == 7 && robot->x != 0)
-		return robot->orientation == HOR ? MOVE_L : ROTATE;
-	
-	if (robot->x == 0 && robot->y != 0)
-		if (robot->y == 1 && robot->dest.value != CELL_CHARGER)
-			return robot->orientation == HOR ? MOVE_R : ROTATE;
-		else
-			return robot->orientation == VER ? MOVE_U : ROTATE;
-	
-	if (robot->x == 8 && robot->y != 7)
-		return robot->orientation == VER ? MOVE_D : ROTATE;
-	
-	if (robot->x == 1 && robot->y == 1)
-		return robot->orientation == VER ? MOVE_U : ROTATE;
-	
-	if (robot->x == 7 && robot->y == 1)
-		return robot->orientation == HOR ? MOVE_R : ROTATE;
 	
 	return NOP;
+}
+
+
+int UnstuckMoveSequence(struct _robot* robot)
+{
+	printf("UMS(): Hello World!\n");
+	
+	srand(time(NULL));
+	if (robot->cur_ori == VER)
+	{
+		struct square left  = {robot->x - 1, robot->y	 };
+		struct square right = {robot->x + 1, robot->y	 };
+		
+		if (!Valid(left) && Valid(right))
+		{
+			robot->next_move_r = true;
+			return ROTATE;
+		}
+		if (Valid(left) && !Valid(right))
+		{
+			robot->next_move_l = true;
+			return ROTATE;
+		}
+		
+		switch(rand() % 2)
+		{
+			case 0:
+				robot->next_move_l = true;
+				break;
+			case 1:
+				robot->next_move_r = true;
+				break;
+		}
+	}
+
+	else
+	{
+		struct square up    = {robot->x	   , robot->y - 1};
+		struct square down  = {robot->x	   , robot->y + 1};
+		
+		if (!Valid(up) && Valid(down))
+		{
+			robot->next_move_d = true;
+			return ROTATE;
+		}
+		if (Valid(up) && !Valid(down))
+		{
+			robot->next_move_u = true;
+			return ROTATE;
+		}
+		
+		switch(rand() % 2)
+		{
+			case 0:
+				robot->next_move_u = true;
+				break;
+			case 1:
+				robot->next_move_d = true;
+				break;
+		}
+	}
+	
+	return ROTATE;
 }
 
 void GetPair(struct _robot* robot)
 {	
 	if (pairs.cur == pairs.length)
 	{
-		pairs.eof = TRUE;
+		pairs.eof = true;
 		printf("GetPair(): End of LOG file...\n");
 		return;
 	}
-	robot->pair[0] = pairs.data[pairs.cur][0];
-	robot->pair[1] = pairs.data[pairs.cur][1];
+	robot->in_num  = pairs.elem[pairs.cur][0];
+	robot->out_num = pairs.elem[pairs.cur][1];
 	++pairs.cur;
 }
 
@@ -699,8 +644,8 @@ void ValidateMacros()
 
 void FilesInit()
 {
-	Parse(path_to_room_file, storage.room);
-	Parse(path_to_robots_file, storage.robots);	
+	Parse(path_to_room_file,   warehouse.room);
+	Parse(path_to_robots_file, warehouse.robots);
 }
 
 void InitROSS()
@@ -708,6 +653,19 @@ void InitROSS()
 	FilesInit();
 	PairsInit(path_to_pairs);
     RobotsInit();
+	
+	FindInsOuts();
+	InitMaps();
+	for (int i = 0; i < ins.size; ++i)
+	{
+		Fill(&in_maps[i], ins.elem[i]);
+		PrintMapConsole(in_maps[i].elem, i);
+	}
+	for (int i = 0; i < outs.size; ++i)
+	{
+		Fill(&out_maps[i], outs.elem[i]);
+		PrintMapConsole(out_maps[i].elem, i);
+	}
 	
 	RobotsPrint();
     PrintMap(path_to_log_folder);
@@ -721,13 +679,166 @@ void Free()
 void FinalizeROSS()
 {
 	PrintNSteps(path_to_log_folder);
+	//PrintNBoxesDelivered();
 	Free();
 }
 
 /*
 void BatteryDeath(struct _robot* robot)
 {
-	storage.robots[robot->y][robot->x] = CELL_EMPTY;
-	robot->battery.dead = TRUE;
+	warehouse.robots[robot->y][robot->x] = CELL_EMPTY;
+	robot->battery.dead = true;
+}
+
+
+void PrintNBoxesDelivered()
+{
+	FILE* f = fopen("/mnt/c/Dev/Base/graph/boxes_delivered.csv", "a");
+	fprintf(f, "%d,", glb_time / 9000);
+	for (int i = 0; i < Robots.N - 1; ++i)
+		fprintf(f, "%d,", Robots.elem[i].boxes_delivered);
+	fprintf(f, "%d\n", Robots.elem[Robots.N - 1].boxes_delivered);
+	fclose(f);
 }
 */
+
+void Fill(struct map* map, struct square cur)
+{	
+	int level = map->elem[cur.y][cur.x];
+	
+	if (!Valid(cur))
+		return;
+	
+	if (map->covered[cur.y][cur.x])
+		return;
+	
+	struct square left  = {cur.x - 1, cur.y	   };
+	struct square right = {cur.x + 1, cur.y	   };
+	struct square up    = {cur.x	, cur.y - 1};
+	struct square down  = {cur.x	, cur.y + 1};
+	
+	
+	if (Valid(left)  && map->elem[left.y][left.x]   > level + 1)
+	{
+		map->elem   [left.y][left.x]   = level + 1;
+		map->covered[left.y][left.x]   = false;
+	}
+	
+	if (Valid(right) && map->elem[right.y][right.x] > level + 1)
+	{
+		map->elem   [right.y][right.x] = level + 1;
+		map->covered[right.y][right.x] = false;
+	}
+	
+	if (Valid(up) 	 && map->elem[up.y][up.x]       > level + 1)
+	{
+		map->elem   [up.y][up.x] 	   = level + 1;
+		map->covered[up.y][up.x]	   = false;
+	}
+	
+	if (Valid(down)  && map->elem[down.y][down.x]   > level + 1)
+	{
+		map->elem   [down.y][down.x]   = level + 1;
+		map->covered[down.y][down.x]   = false;
+	}
+	
+	map->covered[cur.y][cur.x] = true;
+	
+	Fill(map, left);
+	Fill(map, right);
+	Fill(map, up);
+	Fill(map, down);
+}
+
+bool Valid(struct square A)
+{
+	return A.x >= 0 && A.x < warehouse.size_x && A.y >= 0 && A.y < warehouse.size_y \
+		   && warehouse.room[A.y][A.x] != CELL_WALL;
+}
+
+bool Empty(struct square A)
+{
+	return true;
+	//return warehouse.robots[A.y][A.x] == CELL_EMPTY;
+}
+
+void InitMaps()
+{
+	for (int i = 0; i < N_INS; ++i)
+	{
+		for (int y = 0; y < MAX_ROOM_SIZE_Y; ++y)
+			for (int x = 0; x < MAX_ROOM_SIZE_X; ++x)
+			{
+				in_maps[i].elem   [y][x] = BIG_NUMBER;
+				in_maps[i].covered[y][x] = false;
+			}
+		in_maps[i].elem[ins.elem[i].y][ins.elem[i].x] = 0; // IN
+	}
+	
+	for (int i = 0; i < N_OUTS; ++i)
+	{
+		for (int y = 0; y < MAX_ROOM_SIZE_Y; ++y)
+			for (int x = 0; x < MAX_ROOM_SIZE_X; ++x)
+			{
+				out_maps[i].elem   [y][x] = BIG_NUMBER;
+				out_maps[i].covered[y][x] = false;
+			}
+		out_maps[i].elem[outs.elem[i].y][outs.elem[i].x] = 0; // OUT
+	}
+}
+
+void FindInsOuts()
+{
+	ins.size = 0;
+	for (int y = 0; y < warehouse.size_y; ++y)
+		for (int x = 0; x < warehouse.size_x; ++x)
+			if (warehouse.room[y][x] == CELL_IN)
+			{
+				struct square tmp = {x, y};
+				ins.elem[ins.size] = tmp;
+				++ins.size;
+			}
+			
+	outs.size = 0;
+	for (int y = 0; y < warehouse.size_y; ++y)
+		for (int x = 0; x < warehouse.size_x; ++x)
+			if (warehouse.room[y][x] == CELL_OUT)
+			{
+				struct square tmp = {x, y};
+				outs.elem[outs.size] = tmp;
+				++outs.size;
+			}
+}
+
+void PrintMapConsole(int map[MAX_ROOM_SIZE_Y][MAX_ROOM_SIZE_X], int outNum)
+{
+	printf("\n*** WEIGHT MAP FOR IN/OUT NUMBER %d ***\n", outNum);
+	for (int y = 0; y < warehouse.size_y; ++y)
+	{
+		for (int x = 0; x < warehouse.size_x; ++x)
+			printf("%3d ", map[y][x]);
+		printf("\n");
+	}
+}
+
+void PrintCovered(bool cov[MAX_ROOM_SIZE_Y][MAX_ROOM_SIZE_X], int outNum)
+{
+	printf("\n*** COVERAGE MAP FOR OUT NUMBER %d ***\n", outNum);
+	for (int y = 0; y < warehouse.size_y; ++y)
+	{
+		for (int x = 0; x < warehouse.size_x; ++x)
+			printf("%d ", cov[y][x]);
+		printf("\n");
+	}
+}
+
+void PrintRoom()
+{
+	printf("\n***        ROOM GEOMETRY        ***\n");
+	for (int y = 0; y < warehouse.size_y; ++y)
+	{
+		for (int x = 0; x < warehouse.size_x; ++x)
+			printf("%d ", warehouse.room[y][x]);
+		printf("\n");
+	}
+}
