@@ -44,7 +44,7 @@
 #define   MOVE_TIME 1		
 #define   LOAD_TIME 2
 #define UNLOAD_TIME 1
-#define STALL_TIME  2
+#define STALL_TIME  250
 
 #define MAX_CYCLES_LiFePO4      2000
 #define MAX_CYCLES_LiNiMnCoO2   1500
@@ -57,7 +57,9 @@
 //		1 (m/step) / ROBOT_VELOCITY (m/s) = 0.4 (sec/step)
 // 9000 * 0.4 = 3600
 // => 1 hr of real time is 9000 simulation steps
-#define GLOBAL_TIME_END (1000)
+#define GLOBAL_TIME_END (9000 * 24)
+
+FILE* LogFile;
 
 typedef enum
 {
@@ -99,6 +101,8 @@ struct _outs
 
 struct _ins  ins;
 struct _outs outs;
+
+char CurMove[MAX_ROBOTS];
 
 struct map
 {
@@ -178,13 +182,10 @@ struct _robot
 	CELL goal_cell;
 	
 	bool loaded;
+	bool emergency;
+	bool escape_flower;
 	
-	bool next_move_l;
-	bool next_move_r;
-	bool next_move_u;
-	bool next_move_d;
-	
-	bool next_move_stall;
+	struct square flower_goal;
 	
 	ori  cur_ori;
 	ori dest_ori;
@@ -199,6 +200,8 @@ struct _robot
 		STOP,
 		MOTION
 	} state;
+	
+	struct map emergency_map;
 };
 
 struct _robots
@@ -283,12 +286,6 @@ extern void PairsInit(const char* path);
 // Frees the memory
 extern void FreePairs();
 
-// Prints a snapshot .csv
-extern void PrintMap(const char* log_folder_path);
-
-// Prints Number_of_Steps.txt file 
-extern void PrintNSteps(const char* log_folder_path);
-
 extern void RobotsInit();
 
 // Prints to the console coords of each robot
@@ -332,11 +329,23 @@ extern void PrintNBoxesDelivered();
 extern void FindInsOuts();
 extern void InitMaps();
 extern void Fill(struct map* map, struct square cur);
-extern void PrintMapConsole(int  map[MAX_ROOM_SIZE_Y][MAX_ROOM_SIZE_X], int outNum);
-extern void PrintCovered   (bool cov[MAX_ROOM_SIZE_Y][MAX_ROOM_SIZE_X], int outNum);
+extern void PrintMapConsole(int  map[MAX_ROOM_SIZE_Y][MAX_ROOM_SIZE_X], int Num);
+extern void PrintCovered   (bool cov[MAX_ROOM_SIZE_Y][MAX_ROOM_SIZE_X], int Num);
 extern void PrintRoom();
 extern bool Valid(struct square A);
-extern bool Empty(struct square A);
 extern int UnstuckMoveSequence(struct _robot* robot);
+extern void PrintMoves();
+extern void PrintMovesInit();
+extern void EmergencyFill(struct _robot* robot, struct square cur);
+extern void EmergencyMapFill(struct _robot* robot);
+extern bool ValidEmpty(struct square A);
+extern bool ValidEmptyExcludingCurRobot(struct _robot* robot, struct square A);
+extern void EmergencyMapInit(struct map* emergency_map);
+extern int RandomLegalMove(struct _robot* robot);
+extern bool EverybodyWhoIsStuckFailedToGetOut();
+extern void DumpRobots();
+extern bool BlockedFromAllSides(int x, int y);
+extern bool FlowerFormation(struct _robot* robot);
+extern bool isFlower(struct square center);
 
 #endif

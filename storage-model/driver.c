@@ -79,12 +79,14 @@ void model_init(state* s, tw_lp* lp)
 		Robots.elem[lp->gid - 1].battery.time_spent_charging = 0;
 		Robots.elem[lp->gid - 1].boxes_delivered 			 = 0;
 		Robots.elem[lp->gid - 1].stuck 						 = 0;
+		Robots.elem[lp->gid - 1].emergency				     = false;
+		Robots.elem[lp->gid - 1].escape_flower				 = false;
 		
-		Robots.elem[lp->gid - 1].next_move_l 				 = false;
-		Robots.elem[lp->gid - 1].next_move_r 				 = false;
-		Robots.elem[lp->gid - 1].next_move_u 				 = false;
-		Robots.elem[lp->gid - 1].next_move_d 				 = false;
-		Robots.elem[lp->gid - 1].next_move_stall			 = false;
+		struct square tmp = {-1, -1};
+		Robots.elem[lp->gid - 1].flower_goal				 = tmp;
+		
+		EmergencyMapInit(&Robots.elem[lp->gid - 1].emergency_map);
+		PrintMapConsole(Robots.elem[lp->gid - 1].emergency_map.elem, 333);
 		
 		AssignDest(&Robots.elem[lp->gid - 1], CELL_IN);
     
@@ -116,7 +118,6 @@ void model_init(state* s, tw_lp* lp)
 void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
 {
     int self = lp->gid;
-    bool is_executed = false;
     // initialize the bit field
     *(int*)bf = (int)0;
 
@@ -160,7 +161,7 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
 				//if (glb_time % 9000 == 0) // every hour
 				//	PrintNBoxesDelivered();
 				
-				PrintMap(path_to_log_folder);
+				PrintMoves();
 				glb_time += 1;
 				
 				for (int i = 0; i < Robots.N; ++i)
@@ -178,6 +179,7 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
         case ROBOT:
             {
             struct _robot* this = &Robots.elem[self-1];
+			CurMove[self-1] = 'N';
 			
 			switch (in_msg->type)
             {
@@ -202,11 +204,12 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
 						warehouse.robots[this->y][this->x] = this->loaded? CELL_FULL_ROBOT_VER: CELL_EMPT_ROBOT_VER;
 					}
 					
+					CurMove[self-1] = 'F';
 					this->battery.charge -= ROTATE_COST;
                     break;
                 case MOVE_U:
                     ++s->got_msgs_MOVE_U;
-					if (this->time_in_action > 1)
+					if (this->time_in_action > 1) //busy
 						break;
 					this->time_in_action = MOVE_TIME;
 					
@@ -228,14 +231,15 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
 									this->battery.charge -= KEEP_MOTION_COST;
 								else if (this->state == STOP)
 									this->battery.charge -= START_MOTION_COST;
-								
+																
 								this->state = MOTION;
 								this->stuck = 0;
+								CurMove[self-1] = 'U';
 							}
 							else //the way is blocked by another robot
 							{
 								++this->stuck;
-								printf("MOVE_U: incrementing this->stuck...\n");
+								//printf("MOVE_U: incrementing this->stuck...\n");
 							}
 							break;
                         case CELL_WALL:
@@ -247,7 +251,7 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
                     break;
 				case MOVE_D:
                     ++s->got_msgs_MOVE_D;
-					if (this->time_in_action > 1)
+					if (this->time_in_action > 1) //busy
 						break;
 					this->time_in_action = MOVE_TIME;
 					
@@ -272,11 +276,12 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
 								
 								this->state = MOTION;
 								this->stuck = 0;
+								CurMove[self-1] = 'D';
 							}
 							else //the way is blocked by another robot
 							{
 								++this->stuck;
-								printf("MOVE_D: incrementing this->stuck...\n");
+								//printf("MOVE_D: incrementing this->stuck...\n");
 							}
                             break;
                         case CELL_WALL:
@@ -288,7 +293,7 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
                     break;
 				case MOVE_L:
                     ++s->got_msgs_MOVE_L;
-					if (this->time_in_action > 1)
+					if (this->time_in_action > 1) //busy
 						break;
 					this->time_in_action = MOVE_TIME;
 					
@@ -313,11 +318,12 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
 								
 								this->state = MOTION;
 								this->stuck = 0;
+								CurMove[self-1] = 'L';
 							}
 							else //the way is blocked by another robot
 							{
 								++this->stuck;
-								printf("MOVE_L: incrementing this->stuck...\n");
+								//printf("MOVE_L: incrementing this->stuck...\n");
 							}
                             break;
                         case CELL_WALL:
@@ -329,7 +335,7 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
                     break;
 				case MOVE_R:
                     ++s->got_msgs_MOVE_R;
-					if (this->time_in_action > 1)
+					if (this->time_in_action > 1) //busy
 						break;
 					this->time_in_action = MOVE_TIME;
 					
@@ -355,11 +361,12 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
 								
 								this->state = MOTION;
 								this->stuck = 0;
+								CurMove[self-1] = 'R';
 							}
 							else //the way is blocked by another robot
 							{
 								++this->stuck;
-								printf("MOVE_R: incrementing this->stuck...\n");
+								//printf("MOVE_R: incrementing this->stuck...\n");
 							}
                             break;
                         case CELL_WALL:
@@ -371,7 +378,7 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
                     break;
                 case LOAD:
                     ++s->got_msgs_LOAD;
-					if (this->time_in_action > 1)
+					if (this->time_in_action > 1) //busy
 						break;
 					this->time_in_action = LOAD_TIME;
 					
@@ -388,11 +395,19 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
 							warehouse.robots[this->y][this->x] = CELL_FULL_ROBOT_HOR;
 						
 						AssignDest(&Robots.elem[self-1], CELL_OUT);
+						CurMove[self-1] = 'I';
+						if (this->emergency)
+						{
+							this->emergency = false;
+							//PrintMapConsole(this->emergency_map.elem, 100);
+							EmergencyMapInit(&this->emergency_map);
+							//PrintMapConsole(this->emergency_map.elem, 200);
+						}
                     }
                     break;
                 case UNLOAD:
                     ++s->got_msgs_UNLOAD;
-					if (this->time_in_action > 1)
+					if (this->time_in_action > 1) //busy
 						break;
 					this->time_in_action = UNLOAD_TIME;
 					
@@ -414,6 +429,14 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
 						//	AssignDest(&Robots.elem[self-1], CELL_CHARGER);
 						//else
 							AssignDest(&Robots.elem[self-1], CELL_IN);
+						CurMove[self-1] = 'O';
+						if (this->emergency)
+						{
+							this->emergency = false;
+							//PrintMapConsole(this->emergency_map.elem, 100);
+							EmergencyMapInit(&this->emergency_map);
+							//PrintMapConsole(this->emergency_map.elem, 200);
+						}
                     }
                     break;
 				case INIT:
