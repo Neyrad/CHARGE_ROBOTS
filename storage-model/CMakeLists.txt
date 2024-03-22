@@ -21,6 +21,11 @@ SET(model_srcs
 	driver.c
 	extras.c
 	map.c
+	battery.c
+	helpers.c
+	init.c
+	print.c
+	routing.c
 	model.h
 	model_config.h
 )

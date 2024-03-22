@@ -28,6 +28,7 @@
 #define MAX_ROBOTS 100
 //#define MAX_INPUT_LENGTH 20000000
 #define MAX_INPUT_LENGTH 2000000
+#define MAX_PATH_TO_LOG_FOLDER 256
 
 /*------------------ENERGY COST DEFINES------------------*/
 #define BATTERY_CAPACITY		152000
@@ -303,13 +304,9 @@ extern void GetPair(struct _robot* robot);
 // Each robot received a command
 extern bool EveryoneResponded(int* arr, int N);
 
-// Simple robot routing (occasionally they run into the central wall)
+
 extern int CalcNextMove(struct _robot* robot);
 
-// Circular robot routing (works properly)
-extern int CalcNextMove2(struct _robot* robot);
-
-// Unit test for the ParsePairs() func
 extern void PrintPairs();
 
 // Battery Degradation Model curve init
@@ -347,5 +344,7 @@ extern void DumpRobots();
 extern bool BlockedFromAllSides(int x, int y);
 extern bool FlowerFormation(struct _robot* robot);
 extern bool isFlower(struct square center);
+extern struct square RandomValidSquare();
+extern bool NoOneInEmergencyMode();
 
 #endif

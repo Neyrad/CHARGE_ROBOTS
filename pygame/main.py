@@ -13,19 +13,18 @@ RED = (255, 0, 0)
 
 FPS = 60
 
-with open(os.path.join('Simulation_History', '_N_STEPS.txt')) as f:
-    N_FRAMES = int(f.read())
-
 CSV_DATA = open(os.path.join('Simulation_History', 'field.csv'))
 FIELD = np.loadtxt(CSV_DATA, delimiter=",")
 
-Array3D = []
-for i in range(1, N_FRAMES+1):
-    CSV_DATA = open(os.path.join('Simulation_History', 'STEP_' + str(i) + '.csv'))
-    Array3D.append(np.loadtxt(CSV_DATA, delimiter=","))
+CSV_DATA = open(os.path.join('Simulation_History', 'robot_numbers.csv'))
+ROBOT_NUMBERS = np.loadtxt(CSV_DATA, delimiter=",")
 
-GRIDHEIGHT = Array3D[0].shape[0]
-GRIDWIDTH = Array3D[0].shape[1]
+LOG_DATA = os.path.join('Simulation_History', 'robots.log')
+LOG = np.genfromtxt(LOG_DATA, dtype=None)
+LOG = [list(i) for i in LOG]
+
+GRIDHEIGHT = FIELD.shape[0]
+GRIDWIDTH = FIELD.shape[1]
 TILESIZE = 100
 WIDTH = GRIDWIDTH * TILESIZE
 HEIGHT = GRIDHEIGHT * TILESIZE
@@ -53,7 +52,17 @@ CONTAINER_IMAGE = pygame.transform.scale(CONTAINER_IMAGE_RAW, (TILESIZE, TILESIZ
 CHARGER_IMAGE_RAW = pygame.image.load(os.path.join('Assets', 'Charger.png'))
 CHARGER_IMAGE = pygame.transform.scale(CHARGER_IMAGE_RAW, (TILESIZE, TILESIZE))
 
-def draw_window(cur_frame):
+N_ROBOTS = ROBOT_NUMBERS.shape[0]
+N_FRAMES = np.asarray(LOG).shape[0]
+
+class Robot:
+    def __init__(self, x, y, ver, box):
+        self.x = x
+        self.y = y
+        self.ver = ver
+        self.box = box
+
+def draw_window(ROBOTS, cur_frame):
     WIN.fill(LIGHT_GREY)
     for y in range(GRIDHEIGHT):
         for x in range(GRIDWIDTH):
@@ -68,16 +77,42 @@ def draw_window(cur_frame):
             elif FIELD[y][x] == 7:
                 WIN.blit(CHARGER_IMAGE, (x * TILESIZE, y * TILESIZE))
 
-            
-            if Array3D[cur_frame][y][x] == 2:
-                WIN.blit(ROBOT_VER, (x * TILESIZE, y * TILESIZE))
-            elif Array3D[cur_frame][y][x] == 4:
-                WIN.blit(ROBOT_HOR, (x * TILESIZE, y * TILESIZE))
-            elif Array3D[cur_frame][y][x] == 6:
-                WIN.blit(ROBOT_BOX_VER, (x * TILESIZE, y * TILESIZE))
-            elif Array3D[cur_frame][y][x] == 8:
-                WIN.blit(ROBOT_BOX_HOR, (x * TILESIZE, y * TILESIZE))
-            
+    for i in range(N_ROBOTS):
+        x = ROBOTS[i].x
+        y = ROBOTS[i].y
+
+        if ROBOTS[i].ver:
+            if ROBOTS[i].box:
+                 WIN.blit(ROBOT_BOX_VER, (x * TILESIZE, y * TILESIZE))
+            else:
+                 WIN.blit(ROBOT_VER, (x * TILESIZE, y * TILESIZE))
+        else:
+            if ROBOTS[i].box:
+                 WIN.blit(ROBOT_BOX_HOR, (x * TILESIZE, y * TILESIZE))
+            else:
+                 WIN.blit(ROBOT_HOR, (x * TILESIZE, y * TILESIZE))    
+        
+        if cur_frame == N_FRAMES: #last frame
+            continue
+
+        if chr(LOG[cur_frame][i]) == 'U':
+            ROBOTS[i].y -= 1
+        elif chr(LOG[cur_frame][i]) == 'D':
+            ROBOTS[i].y += 1
+        elif chr(LOG[cur_frame][i]) == 'L':
+            ROBOTS[i].x -= 1
+        elif chr(LOG[cur_frame][i]) == 'R':
+            ROBOTS[i].x += 1
+        elif chr(LOG[cur_frame][i]) == 'F':
+            ROBOTS[i].ver = not ROBOTS[i].ver
+        elif chr(LOG[cur_frame][i]) == 'I':
+            ROBOTS[i].box = True
+        elif chr(LOG[cur_frame][i]) == 'O':
+            ROBOTS[i].box = False
+        elif chr(LOG[cur_frame][i]) == 'N':
+            pass
+        else:
+            print("Undefined input")
 
     for x in range(0, WIDTH, TILESIZE):
         pygame.draw.line(WIN, BLACK, (x, 0), (x, HEIGHT))
@@ -87,12 +122,21 @@ def draw_window(cur_frame):
     pygame.display.update()
 
 
-TIME_PER_FRAME = 75
+TIME_PER_FRAME = 1
 
 def main():
+    ROBOTS = []
+    for i in range(N_ROBOTS):
+        ROBOTS.append(Robot(0, 0, False, False))
+        ROBOTS[i].x = ROBOT_NUMBERS[i][0]
+        ROBOTS[i].y = ROBOT_NUMBERS[i][1]
+        ROBOTS[i].ver = ROBOT_NUMBERS[i][2]
+        ROBOTS[i].box = ROBOT_NUMBERS[i][3]
+    
     cur_frame = -1
     clock = pygame.time.Clock()
     frame_change_time = 0
+
 
     run = True
     while run:
@@ -104,11 +148,12 @@ def main():
                 sys.exit()
  
         if pygame.time.get_ticks() - frame_change_time > TIME_PER_FRAME:
-            if (cur_frame + 1 >= N_FRAMES):
+            if (cur_frame >= N_FRAMES):
                 run = False
                 break
             cur_frame += 1
-            draw_window(cur_frame)
+            #print(cur_frame)
+            draw_window(ROBOTS, cur_frame)
             frame_change_time = pygame.time.get_ticks()
     
     main()

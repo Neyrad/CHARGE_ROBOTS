@@ -51,52 +51,43 @@ int RobotResponded[MAX_ROBOTS];
 // ! LP can only send messages to itself during init !
 void model_init(state* s, tw_lp* lp)
 {
-    if (lp->gid == 0)
+	int self = lp->gid;
+	
+    if (self == 0)
     {
         s->type = COMMAND_CENTER;
-		
 		for (int i = 0; i < Robots.N; ++i)
 		{
 			RobotResponded[i] = false;
 			InitBDM(&Robots.elem[i], (i == 0)? LiFePO4: (i == 1)? LiNiMnCoO2: (i == 2)? LeadAcid: LiCoO2);
 			//PrintBDM(&Robots.elem[i], (i == 0)? "graph/LiFePO4.csv": (i == 1)? "graph/LiNiMnCoO2.csv": (i == 2)? "graph/LeadAcid.csv": "graph/LiCoO2.csv");
 		}
-		
         printf("COMMAND_CENTER is initialized\n");
     }
     else
     {
         s->type = ROBOT;
-        assert(lp->gid <= Robots.N);
+        assert(self <= Robots.N);
+		struct _robot* this = &Robots.elem[self - 1];
 		
-		Robots.elem[lp->gid - 1].state          	 		 = STOP;
-		Robots.elem[lp->gid - 1].battery.charge   		     = BATTERY_CAPACITY;
-		Robots.elem[lp->gid - 1].battery.capacity        	 = BATTERY_CAPACITY;
-		Robots.elem[lp->gid - 1].battery.charging        	 = false;
-		//Robots.elem[lp->gid - 1].battery.dead        	 	 = false;
-		Robots.elem[lp->gid - 1].time_in_action  			 = 0; //no commands received, no actions performed
-		Robots.elem[lp->gid - 1].battery.times_recharged 	 = 0;
-		Robots.elem[lp->gid - 1].battery.time_spent_charging = 0;
-		Robots.elem[lp->gid - 1].boxes_delivered 			 = 0;
-		Robots.elem[lp->gid - 1].stuck 						 = 0;
-		Robots.elem[lp->gid - 1].emergency				     = false;
-		Robots.elem[lp->gid - 1].escape_flower				 = false;
-		
+		this->state          	 		  = STOP;
+		this->battery.charge   		      = BATTERY_CAPACITY;
+		this->battery.capacity        	  = BATTERY_CAPACITY;
+		this->battery.charging        	  = false;
+		//this->battery.dead        	  = false;
+		this->time_in_action  			  = 0; //no commands received, no actions performed
+		this->battery.times_recharged 	  = 0;
+		this->battery.time_spent_charging = 0;
+		this->boxes_delivered 			  = 0;
+		this->stuck 					  = 0;
+		this->emergency				      = false;
+		this->escape_flower				  = false;
 		struct square tmp = {-1, -1};
-		Robots.elem[lp->gid - 1].flower_goal				 = tmp;
-		
-		EmergencyMapInit(&Robots.elem[lp->gid - 1].emergency_map);
-		PrintMapConsole(Robots.elem[lp->gid - 1].emergency_map.elem, 333);
-		
-		AssignDest(&Robots.elem[lp->gid - 1], CELL_IN);
-    
-        printf("ROBOT #%ld is initialized\n", lp->gid);
+		this->flower_goal				  = tmp;
+		EmergencyMapInit(&this->emergency_map);
+		AssignDest(this, CELL_IN);
+        printf("ROBOT #%d is initialized\n", self);
     }
-
-    int self = lp->gid;
-
-    // init state data
-    s->value = -1;
 
     s->got_msgs_ROTATE	 = 0;
     s->got_msgs_MOVE_U   = 0;
@@ -109,7 +100,7 @@ void model_init(state* s, tw_lp* lp)
     s->got_msgs_INIT     = 0;
 	s->got_msgs_NOP      = 0;
 	
-    if (lp->gid == 0)
+    if (self == 0)
 		for (int i = 1; i <= Robots.N; ++i)
 			SendMessage(i, lp, glb_time, INIT);
 }
@@ -399,9 +390,7 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
 						if (this->emergency)
 						{
 							this->emergency = false;
-							//PrintMapConsole(this->emergency_map.elem, 100);
 							EmergencyMapInit(&this->emergency_map);
-							//PrintMapConsole(this->emergency_map.elem, 200);
 						}
                     }
                     break;
@@ -433,9 +422,7 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
 						if (this->emergency)
 						{
 							this->emergency = false;
-							//PrintMapConsole(this->emergency_map.elem, 100);
 							EmergencyMapInit(&this->emergency_map);
-							//PrintMapConsole(this->emergency_map.elem, 200);
 						}
                     }
                     break;
