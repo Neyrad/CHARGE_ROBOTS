@@ -24,7 +24,10 @@ const char* path_to_pairs       = "log.csv";
 
 int main(int argc, char* argv[])
 {
+	printf("main(): ALIVE\n");
+	
 	InitROSS();
+	printf("PairsInit(): ALIVE\n");
     SimulateROSS(argc, argv);
 	FinalizeROSS();
 }

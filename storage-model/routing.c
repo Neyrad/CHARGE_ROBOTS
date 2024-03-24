@@ -31,7 +31,7 @@ bool isFlower(struct square center)
 	
 	if (warehouse.room[center.y][center.x] == CELL_IN)
 	{
-		if (   warehouse.robots[center.y][center.x] == CELL_FULL_ROBOT_VER || warehouse.robots[center.y][center.x] == CELL_FULL_ROBOT_HOR && \
+		if (   warehouse.robots[center.y][center.x] != CELL_EMPTY && \
 			(!Valid(left)  || warehouse.robots[left.y][left.x]   == CELL_EMPT_ROBOT_HOR || warehouse.room[left.y][left.x]   == CELL_WALL) && \
 			(!Valid(right) || warehouse.robots[right.y][right.x] == CELL_EMPT_ROBOT_HOR || warehouse.room[right.y][right.x] == CELL_WALL) && \
 			(!Valid(up)    || warehouse.robots[up.y][up.x]       == CELL_EMPT_ROBOT_VER || warehouse.room[up.y][up.x]       == CELL_WALL) && \
@@ -43,7 +43,7 @@ bool isFlower(struct square center)
 	
 	if (warehouse.room[center.y][center.x] == CELL_OUT)
 	{
-		if (   warehouse.robots[center.y][center.x] == CELL_EMPT_ROBOT_VER || warehouse.robots[center.y][center.x] == CELL_EMPT_ROBOT_HOR && \
+		if (   warehouse.robots[center.y][center.x] != CELL_EMPTY && \
 			(!Valid(left)  || warehouse.robots[left.y][left.x]   == CELL_FULL_ROBOT_HOR || warehouse.room[left.y][left.x]   == CELL_WALL) && \
 			(!Valid(right) || warehouse.robots[right.y][right.x] == CELL_FULL_ROBOT_HOR || warehouse.room[right.y][right.x] == CELL_WALL) && \
 			(!Valid(up)    || warehouse.robots[up.y][up.x]       == CELL_FULL_ROBOT_VER || warehouse.room[up.y][up.x]       == CELL_WALL) && \
@@ -92,7 +92,13 @@ int CalcNextMove(struct _robot* robot)
 		robot->escape_flower = false;
 		robot->emergency = false;
 	}
-
+/*
+	if (robot->stuck > MOVES_STUCK_LIMIT * 400)
+	{
+		DumpRobots();
+		assert(false);
+	}
+*/
 	if (robot->stuck > MOVES_STUCK_LIMIT)
 	{
 		if (NoOneInEmergencyMode())
@@ -182,6 +188,8 @@ int CalcNextMove(struct _robot* robot)
 	
 	if (value_d < value)
 		return robot->cur_ori == VER? MOVE_D: ROTATE;
+	
+	robot->stuck += 1;
 	
 	return NOP;
 }

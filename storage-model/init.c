@@ -7,18 +7,39 @@ extern const char* path_to_pairs;
 
 void PairsInit(const char* path)
 {
-	pairs.elem = calloc(MAX_INPUT_LENGTH, sizeof(int*));
-	for (size_t i = 0; i < MAX_INPUT_LENGTH; ++i)
+	printf("PairsInit(): ALIVE, sizeof(int) = %ld\n", sizeof(int));
+	
+	
+	pairs.elem = calloc(MAX_INPUT_LENGTH, sizeof(int*));	
+	for (int i = 0; i < MAX_INPUT_LENGTH; ++i)
 		pairs.elem[i] = calloc(2, sizeof(int));
 
     struct stat stats;
     stat(path, &stats);
+
     FILE* f = fopen(path, "r");
     assert(f); //to check correctness of the path
-	assert(stats.st_size < MAX_INPUT_LENGTH * 4);
-    char buf[MAX_INPUT_LENGTH * 4]; //'1' ',' '2' '\n' -> 4 columns (should I consider \r ???)
+	printf("stats.st_size = %ld, MAX_INPUT_LENGTH * 4 = %d\n", stats.st_size, MAX_INPUT_LENGTH * 4);
+	assert(stats.st_size <= MAX_INPUT_LENGTH * 4);
+
+
+
+
+
+ //   char buf[MAX_INPUT_LENGTH * 4]; 
+	char* buf = calloc(MAX_INPUT_LENGTH * 4, sizeof(char)); //'1' ',' '2' '\n' -> 4 columns (should I consider \r ???)
+
+
     fread(buf, sizeof(buf[0]), stats.st_size, f);
     fclose(f);
+
+
+
+
+
+
+
+
 
 	pairs.length = 0;
     int x = 0;
@@ -38,6 +59,12 @@ void PairsInit(const char* path)
     }
 	pairs.cur = 0;
 	pairs.eof = false;
+	
+	
+	free(buf);
+	
+	printf("PairsInit(): ALIVE\n");
+	//assert(false);
 }
 
 void RobotsInit()
@@ -73,19 +100,49 @@ void RobotsInit()
 
 void FilesInit()
 {
+	printf("FilesInit(): ALIVE\n");
+	
 	Parse(path_to_room_file,   warehouse.room);
+	
+	printf("FilesInit(): ALIVE\n");
+	
 	Parse(path_to_robots_file, warehouse.robots);
+	
+	printf("FilesInit(): ALIVE\n");
+	
 	PairsInit(path_to_pairs);
+	
+	printf("FilesInit(): ALIVE\n");
+	
 	PrintMovesInit();
+	
+	printf("FilesInit(): ALIVE\n");
 }
 
 void InitROSS()
 {
+	printf("InitROSS(): ALIVE\n");
+	
+	srand(time(NULL));
+	
+	printf("InitROSS(): ALIVE\n");
+	
 	FilesInit();
+	
+	printf("InitROSS(): ALIVE\n");
+	
     RobotsInit();
 	
+	printf("InitROSS(): ALIVE\n");
+	
 	FindInsOuts();
+	
+	printf("InitROSS(): ALIVE\n");
+	
 	InitMaps();
+	
+	printf("InitROSS(): ALIVE\n");
+	
 	for (int i = 0; i < ins.size; ++i)
 	{
 		Fill(&in_maps[i], ins.elem[i]);
@@ -97,7 +154,11 @@ void InitROSS()
 		PrintMapConsole(out_maps[i].elem, i);
 	}
 	
+	printf("InitROSS(): ALIVE\n");
+	
 	RobotsPrint();
+	
+	printf("InitROSS(): ALIVE\n");
 }
 
 void PrintMovesInit() // empties the log file beforehand

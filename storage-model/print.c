@@ -134,6 +134,7 @@ void DumpRobots()
 		printf("Robots.elem[%d].loaded            = %d\n", i, Robots.elem[i].loaded);
 		printf("Robots.elem[%d].in_num            = %d\n", i, Robots.elem[i].in_num);
 		printf("Robots.elem[%d].out_num           = %d\n", i, Robots.elem[i].out_num);
+		printf("Robots.elem[%d].cur_ori           = %d\n", i, Robots.elem[i].cur_ori);
 		PrintMapConsole(Robots.elem[i].emergency_map.elem, i);
 		//PrintMapConsole(Robots.elem[i].emergency_map.covered, i);
 		printf("\n\n\n");

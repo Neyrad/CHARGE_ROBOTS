@@ -27,7 +27,7 @@
 #define MAX_COMMENT_LENGTH 1000
 #define MAX_ROBOTS 100
 //#define MAX_INPUT_LENGTH 20000000
-#define MAX_INPUT_LENGTH 2000000
+#define MAX_INPUT_LENGTH 7200000
 #define MAX_PATH_TO_LOG_FOLDER 256
 
 /*------------------ENERGY COST DEFINES------------------*/
@@ -58,7 +58,7 @@
 //		1 (m/step) / ROBOT_VELOCITY (m/s) = 0.4 (sec/step)
 // 9000 * 0.4 = 3600
 // => 1 hr of real time is 9000 simulation steps
-#define GLOBAL_TIME_END (9000 * 24)
+#define GLOBAL_TIME_END (365 * 9000 * 24)
 
 FILE* LogFile;
 

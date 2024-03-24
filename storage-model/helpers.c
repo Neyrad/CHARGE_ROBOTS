@@ -63,6 +63,7 @@ struct square RandomValidSquare()
 	int tries = 100;
 	for (int i = 0; i < tries; ++i)
 	{
+		//int rand_x = (rand() % (warehouse.size_x / 3)) + (warehouse.size_x / 3);
 		struct square random_square = {rand() % warehouse.size_x, rand() % warehouse.size_y};
 		if (Valid(random_square) && !BlockedFromAllSides(random_square.x, random_square.y))
 			return random_square;

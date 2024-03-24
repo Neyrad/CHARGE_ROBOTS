@@ -8,7 +8,7 @@ extern int glb_time;
 
 void FreePairs()
 {	
-	for (size_t i = 0; i < MAX_INPUT_LENGTH; ++i)
+	for (int i = 0; i < MAX_INPUT_LENGTH; ++i)
 		free(pairs.elem[i]);
 	free(pairs.elem);
 }
