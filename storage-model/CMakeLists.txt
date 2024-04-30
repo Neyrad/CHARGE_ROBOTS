@@ -26,6 +26,7 @@ SET(model_srcs
 	init.c
 	print.c
 	routing.c
+	commands.c
 	model.h
 	model_config.h
 )

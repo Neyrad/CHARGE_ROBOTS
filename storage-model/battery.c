@@ -1,8 +1,8 @@
 #include "model.h"
 
-void InitBDM(struct _robot* robot, BatteryType BT)
+void InitDegradationModel(struct _robot* robot, BatteryType BT)
 {
-	robot->battery.BDM_cur = 0;
+	robot->battery.DegradationModel.cur = 0;
 	robot->battery.type = BT;
 	switch(robot->battery.type)
 	{
@@ -13,7 +13,7 @@ void InitBDM(struct _robot* robot, BatteryType BT)
 			const float C =  1;
 	
 			for (int i = 0; i < MAX_CYCLES_LiFePO4; ++i)
-				robot->battery.BDM[i] = (A*i*i + B*i + C) * BATTERY_CAPACITY;
+				robot->battery.DegradationModel.elem[i] = (A*i*i + B*i + C) * BATTERY_CAPACITY;
 		}
 			break;
 		case LiNiMnCoO2:
@@ -25,9 +25,9 @@ void InitBDM(struct _robot* robot, BatteryType BT)
 			const int FUNC_CHANGE_CYCLE = 850;	
 	
 			for (int i = 0;   i < FUNC_CHANGE_CYCLE && i < MAX_CYCLES_LiNiMnCoO2; ++i)
-				robot->battery.BDM[i] = (A1*i + B1) * BATTERY_CAPACITY;
+				robot->battery.DegradationModel.elem[i] = (A1*i + B1) * BATTERY_CAPACITY;
 			for (int i = FUNC_CHANGE_CYCLE;            i < MAX_CYCLES_LiNiMnCoO2; ++i)
-				robot->battery.BDM[i] = (A2*i + B2) * BATTERY_CAPACITY;
+				robot->battery.DegradationModel.elem[i] = (A2*i + B2) * BATTERY_CAPACITY;
 		}
 			break;
 		case LeadAcid:
@@ -59,11 +59,11 @@ void InitBDM(struct _robot* robot, BatteryType BT)
 						
 					b = points[cur_pnt].y - k * points[cur_pnt].x;
 					
-					//printf("InitBDM(): k = %f, b = %f\n", k, b);
+					//printf("InitDegradationModel(): k = %f, b = %f\n", k, b);
 					
 					++cur_pnt;
 				}
-				robot->battery.BDM[i] = (k * i + b) * BATTERY_CAPACITY;
+				robot->battery.DegradationModel.elem[i] = (k * i + b) * BATTERY_CAPACITY;
 			}	
 		}
 			break;
@@ -96,16 +96,16 @@ void InitBDM(struct _robot* robot, BatteryType BT)
 						
 					b = points[cur_pnt].y - k * points[cur_pnt].x;
 					
-					//printf("InitBDM(): k = %f, b = %f\n", k, b);
+					//printf("InitDegradationModel(): k = %f, b = %f\n", k, b);
 					
 					++cur_pnt;
 				}
-				robot->battery.BDM[i] = (k * i + b) * BATTERY_CAPACITY;
+				robot->battery.DegradationModel.elem[i] = (k * i + b) * BATTERY_CAPACITY;
 			}	
 		}
 			break;
 		default:
-			printf("InitBDM(): Unknown battery type [%d]\n", robot->battery.type);
+			printf("InitDegradationModel(): Unknown battery type [%d]\n", robot->battery.type);
 			return;
 	}
 }
@@ -132,12 +132,12 @@ int CalculateCapacity(struct _robot* robot)
 			return -1;
 	}
 	
-	if (robot->battery.BDM_cur == MAX_CYCLES - 1)
+	if (robot->battery.DegradationModel.cur == MAX_CYCLES - 1)
 	{
 		//BatteryDeath();
 		printf("\n\n\nCalculateCapacity(): battery of the robot #??? died...\n\n\n\n");
 	}
-	//assert(robot->battery.BDM_cur < MAX_CYCLES);
-	//assert(robot->battery.BDM[robot->battery.BDM_cur] > 0);
-	return robot->battery.BDM[robot->battery.BDM_cur++];
+	//assert(robot->battery.DegradationModel.cur < MAX_CYCLES);
+	//assert(robot->battery.DegradationModel.elem[robot->battery.DegradationModel.cur] > 0);
+	return robot->battery.DegradationModel.elem[robot->battery.DegradationModel.cur++];
 }

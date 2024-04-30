@@ -5,15 +5,30 @@ void AssignDest(struct _robot* robot, CELL goal_cell)
 	if      (goal_cell == CELL_IN)
 		GetPair(robot);
 		
-	//else if (goal == CELL_CHARGER)
-		//choose the closest free charger
+	else if (goal_cell == CELL_CHARGER)
+	{
+		if(!AssignEmptyChargerIfPossible(robot))
+			robot->charger_num = rand() % chargers.size;
+	}
 	
 	robot->goal_cell = goal_cell;
 }
 
+bool AssignEmptyChargerIfPossible(struct _robot* robot)
+{
+	for (int i = 0; i < chargers.size; ++i)
+		if (warehouse.robots[chargers.elem[i].y][chargers.elem[i].x] == CELL_EMPTY)
+		{
+			robot->charger_num = i;
+			return true;
+		}
+	return false;
+}
+
 void EmergencyMapFill(struct _robot* robot) // DynamicMap? alt name
 {
-	struct square goal = robot->goal_cell == CELL_IN? ins.elem[robot->in_num]: outs.elem[robot->out_num];		 
+	struct square goal = robot->goal_cell == CELL_IN?  ins.elem[robot->in_num]: \
+						 robot->goal_cell == CELL_OUT? outs.elem[robot->out_num]: chargers.elem[robot->charger_num];
 	assert(Valid(goal));
 	
 	EmergencyMapInit(&robot->emergency_map);
@@ -29,32 +44,23 @@ bool isFlower(struct square center)
 	struct square up    = {center.x	   , center.y - 1};
 	struct square down  = {center.x	   , center.y + 1};
 	
-	if (warehouse.room[center.y][center.x] == CELL_IN)
-	{
-		if (   warehouse.robots[center.y][center.x] != CELL_EMPTY && \
-			(!Valid(left)  || warehouse.robots[left.y][left.x]   == CELL_EMPT_ROBOT_HOR || warehouse.room[left.y][left.x]   == CELL_WALL) && \
-			(!Valid(right) || warehouse.robots[right.y][right.x] == CELL_EMPT_ROBOT_HOR || warehouse.room[right.y][right.x] == CELL_WALL) && \
-			(!Valid(up)    || warehouse.robots[up.y][up.x]       == CELL_EMPT_ROBOT_VER || warehouse.room[up.y][up.x]       == CELL_WALL) && \
-			(!Valid(down)  || warehouse.robots[down.y][down.x]   == CELL_EMPT_ROBOT_VER || warehouse.room[down.y][down.x]   == CELL_WALL))
-			return true;
-		else
-			return false;
-	}
+	if (   warehouse.robots[center.y][center.x] != CELL_EMPTY && \
+		(!Valid(left)  || warehouse.robots[left.y][left.x]   == CELL_EMPT_ROBOT_HOR || \
+						  warehouse.robots[left.y][left.x]   == CELL_FULL_ROBOT_HOR || warehouse.room[left.y][left.x]   == CELL_WALL) && \
+							  
+		(!Valid(right) || warehouse.robots[right.y][right.x] == CELL_EMPT_ROBOT_HOR || \
+						  warehouse.robots[right.y][right.x] == CELL_FULL_ROBOT_HOR || warehouse.room[right.y][right.x] == CELL_WALL) && \
+							  
+		(!Valid(up)    || warehouse.robots[up.y][up.x]       == CELL_EMPT_ROBOT_VER || \
+						  warehouse.robots[up.y][up.x]       == CELL_FULL_ROBOT_VER || warehouse.room[up.y][up.x]       == CELL_WALL) && \
+							  
+		(!Valid(down)  || warehouse.robots[down.y][down.x]   == CELL_EMPT_ROBOT_VER || \
+						  warehouse.robots[down.y][down.x]   == CELL_FULL_ROBOT_VER || warehouse.room[down.y][down.x]   == CELL_WALL))
+		return true;
+	else
+		return false;
 	
-	if (warehouse.room[center.y][center.x] == CELL_OUT)
-	{
-		if (   warehouse.robots[center.y][center.x] != CELL_EMPTY && \
-			(!Valid(left)  || warehouse.robots[left.y][left.x]   == CELL_FULL_ROBOT_HOR || warehouse.room[left.y][left.x]   == CELL_WALL) && \
-			(!Valid(right) || warehouse.robots[right.y][right.x] == CELL_FULL_ROBOT_HOR || warehouse.room[right.y][right.x] == CELL_WALL) && \
-			(!Valid(up)    || warehouse.robots[up.y][up.x]       == CELL_FULL_ROBOT_VER || warehouse.room[up.y][up.x]       == CELL_WALL) && \
-			(!Valid(down)  || warehouse.robots[down.y][down.x]   == CELL_FULL_ROBOT_VER || warehouse.room[down.y][down.x]   == CELL_WALL))
-			return true;
-		else
-			return false;
-	}
-	
-	printf("isFlower(): ERROR! Unknown goal cell...\n");
-	return false;
+	//printf("isFlower(): ERROR! Unknown goal cell...\n");
 }
 
 bool FlowerFormation(struct _robot* robot)
@@ -86,6 +92,29 @@ int CalcNextMove(struct _robot* robot)
 		robot->time_in_action -= 1;
 		return NOP;
 	}
+
+	if (robot->battery.charging)
+	{
+		if (robot->battery.charge < robot->battery.capacity)
+		{
+			robot->battery.charge += CHARGE_CHUNK;
+			if (robot->battery.charge > robot->battery.capacity)
+				robot->battery.charge = robot->battery.capacity;
+			robot->battery.time_spent_charging += 1;
+		}
+		
+		else //fully charged
+		{
+			robot->battery.times_recharged += 1;
+			robot->battery.capacity 		= CalculateCapacity(robot);
+			robot->battery.charge  			= robot->battery.capacity;
+			robot->battery.charging 		= false;
+			AssignDest(robot, CELL_IN);
+		}
+		
+		return NOP;
+	}
+
 
 	if (robot->escape_flower && robot->x == robot->flower_goal.x && robot->y == robot->flower_goal.y)
 	{
@@ -133,10 +162,11 @@ int CalcNextMove(struct _robot* robot)
 		}
 	}
 
-	struct map* Map = robot->emergency? 		    &robot->emergency_map:  \
-					  robot->goal_cell == CELL_IN?  &in_maps[robot->in_num]:
-					  robot->goal_cell == CELL_OUT? &out_maps[robot->out_num]: NULL;
-	assert(Map);
+	struct _map* map = robot->emergency? 		         &robot->emergency_map:     \
+			   		   robot->goal_cell == CELL_IN?      &in_maps[robot->in_num]:   \
+					   robot->goal_cell == CELL_OUT?     &out_maps[robot->out_num]: \
+					   robot->goal_cell == CELL_CHARGER? &charger_maps[robot->charger_num]: NULL;
+	assert(map);
 
 	switch (robot->goal_cell)
 	{
@@ -153,9 +183,13 @@ int CalcNextMove(struct _robot* robot)
 			break;
 			
 		case CELL_CHARGER:
-			robot->battery.charging = true;
-			//TODO
-			return NOP;
+			if (robot->x == chargers.elem[robot->charger_num].x && \
+				robot->y == chargers.elem[robot->charger_num].y)
+			{
+				robot->battery.charging = true;
+				return NOP;
+			}
+			break;
 	}
 	
 	struct square cur   = {robot->x	   , robot->y	 };
@@ -166,12 +200,12 @@ int CalcNextMove(struct _robot* robot)
 	struct square down  = {robot->x	   , robot->y + 1};
 				
 				
-	int value 	= Map->elem[cur.y][cur.x];
+	int value 	= map->elem[cur.y][cur.x];
 				
-	int value_l = Valid(left)?  Map->elem[left.y][left.x]:   BIG_NUMBER;
-	int value_r = Valid(right)? Map->elem[right.y][right.x]: BIG_NUMBER;
-	int value_u = Valid(up)? 	Map->elem[up.y][up.x]:   	 BIG_NUMBER;
-	int value_d = Valid(down)?  Map->elem[down.y][down.x]:   BIG_NUMBER;
+	int value_l = Valid(left)?  map->elem[left.y][left.x]:   BIG_NUMBER;
+	int value_r = Valid(right)? map->elem[right.y][right.x]: BIG_NUMBER;
+	int value_u = Valid(up)? 	map->elem[up.y][up.x]:   	 BIG_NUMBER;
+	int value_d = Valid(down)?  map->elem[down.y][down.x]:   BIG_NUMBER;
 				
 	//printf("robot->in_num = %d, robot->out_num = %d\n", robot->in_num, robot->out_num);
 	//printf("value = %d, value_l = %d, value_r = %d, value_u = %d, value_d = %d\n", \
@@ -197,7 +231,7 @@ int CalcNextMove(struct _robot* robot)
 
 void EmergencyFill(struct _robot* robot, struct square cur)
 {
-	struct map* map = &robot->emergency_map;
+	struct _map* map = &robot->emergency_map;
 	
 	int level = map->elem[cur.y][cur.x];
 	
@@ -246,7 +280,7 @@ void EmergencyFill(struct _robot* robot, struct square cur)
 }
 
 
-void Fill(struct map* map, struct square cur)
+void Fill(struct _map* map, struct square cur)
 {	
 	int level = map->elem[cur.y][cur.x];
 	

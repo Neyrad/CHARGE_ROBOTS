@@ -59,8 +59,8 @@ void model_init(state* s, tw_lp* lp)
 		for (int i = 0; i < Robots.N; ++i)
 		{
 			RobotResponded[i] = false;
-			InitBDM(&Robots.elem[i], (i == 0)? LiFePO4: (i == 1)? LiNiMnCoO2: (i == 2)? LeadAcid: LiCoO2);
-			//PrintBDM(&Robots.elem[i], (i == 0)? "graph/LiFePO4.csv": (i == 1)? "graph/LiNiMnCoO2.csv": (i == 2)? "graph/LeadAcid.csv": "graph/LiCoO2.csv");
+			InitDegradationModel(&Robots.elem[i], (i == 0)? LiFePO4: (i == 1)? LiNiMnCoO2: (i == 2)? LeadAcid: LiCoO2);
+			//PrintDegradationModel(&Robots.elem[i], (i == 0)? "graph/LiFePO4.csv": (i == 1)? "graph/LiNiMnCoO2.csv": (i == 2)? "graph/LeadAcid.csv": "graph/LiCoO2.csv");
 		}
         printf("COMMAND_CENTER is initialized\n");
     }
@@ -80,6 +80,11 @@ void model_init(state* s, tw_lp* lp)
 		this->battery.time_spent_charging = 0;
 		this->boxes_delivered 			  = 0;
 		this->stuck 					  = 0;
+		
+		this->in_num					  = 0;
+		this->out_num					  = 0;
+		this->charger_num				  = 0;
+		
 		this->emergency				      = false;
 		this->escape_flower				  = false;
 		struct square tmp = {-1, -1};
@@ -139,10 +144,10 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
 				return;
 			
 			for (int i = 0; i < Robots.N; ++i)
-				if (Robots.elem[i].battery.BDM_cur >= MAX_CYCLES_LiFePO4    && Robots.elem[i].battery.type == LiFePO4 || \
-					Robots.elem[i].battery.BDM_cur >= MAX_CYCLES_LiNiMnCoO2 && Robots.elem[i].battery.type == LiNiMnCoO2 || \
-					Robots.elem[i].battery.BDM_cur >= MAX_CYCLES_LeadAcid   && Robots.elem[i].battery.type == LeadAcid || \
-					Robots.elem[i].battery.BDM_cur >= MAX_CYCLES_LiCoO2     && Robots.elem[i].battery.type == LiCoO2)
+				if (Robots.elem[i].battery.DegradationModel.cur >= MAX_CYCLES_LiFePO4    && Robots.elem[i].battery.type == LiFePO4 || \
+					Robots.elem[i].battery.DegradationModel.cur >= MAX_CYCLES_LiNiMnCoO2 && Robots.elem[i].battery.type == LiNiMnCoO2 || \
+					Robots.elem[i].battery.DegradationModel.cur >= MAX_CYCLES_LeadAcid   && Robots.elem[i].battery.type == LeadAcid || \
+					Robots.elem[i].battery.DegradationModel.cur >= MAX_CYCLES_LiCoO2     && Robots.elem[i].battery.type == LiCoO2)
 						return;
 
 
@@ -175,256 +180,32 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
 			switch (in_msg->type)
             {
                 case ROTATE:
-                    ++s->got_msgs_ROTATE;
-					if (this->time_in_action > 1) //busy
-						break;
-					this->time_in_action = ROTATE_TIME;
-					
-					if (this->state == MOTION)
-						this->battery.charge -= STOP_MOTION_COST;
-					this->state = STOP;
-					
-					if (this->cur_ori == VER)
-					{
-						this->cur_ori = HOR;
-						warehouse.robots[this->y][this->x] = this->loaded? CELL_FULL_ROBOT_HOR: CELL_EMPT_ROBOT_HOR;
-					}
-					else
-					{
-						this->cur_ori = VER;
-						warehouse.robots[this->y][this->x] = this->loaded? CELL_FULL_ROBOT_VER: CELL_EMPT_ROBOT_VER;
-					}
-					
-					CurMove[self-1] = 'F';
-					this->battery.charge -= ROTATE_COST;
+					++s->got_msgs_ROTATE;
+                    Rotate(this, self);
                     break;
                 case MOVE_U:
                     ++s->got_msgs_MOVE_U;
-					if (this->time_in_action > 1) //busy
-						break;
-					this->time_in_action = MOVE_TIME;
-					
-					assert(this->cur_ori == VER);
-					assert(this->y - 1 >= 0);
-                    switch(warehouse.room[this->y - 1][this->x])
-                    {
-                        case CELL_EMPTY:
-						case CELL_IN:
-						case CELL_OUT:
-						case CELL_CHARGER:
-							if (warehouse.robots[this->y - 1][this->x] == CELL_EMPTY)
-							{
-								warehouse.robots[this->y - 1][this->x] = this->loaded? CELL_FULL_ROBOT_VER: CELL_EMPT_ROBOT_VER;
-								warehouse.robots[this->y    ][this->x] = CELL_EMPTY;
-								this->y = this->y - 1;
-								
-								if 		(this->state == MOTION)
-									this->battery.charge -= KEEP_MOTION_COST;
-								else if (this->state == STOP)
-									this->battery.charge -= START_MOTION_COST;
-																
-								this->state = MOTION;
-								this->stuck = 0;
-								CurMove[self-1] = 'U';
-							}
-							else //the way is blocked by another robot
-							{
-								++this->stuck;
-								//printf("MOVE_U: incrementing this->stuck...\n");
-							}
-							break;
-                        case CELL_WALL:
-							this->state = STOP;
-							break;
-                        default:
-                            break;
-                    }
+					Move(this, 'U', self);
                     break;
 				case MOVE_D:
                     ++s->got_msgs_MOVE_D;
-					if (this->time_in_action > 1) //busy
-						break;
-					this->time_in_action = MOVE_TIME;
-					
-					assert(this->cur_ori == VER);
-					assert(this->y + 1 < warehouse.size_y);
-                    switch(warehouse.room[this->y + 1][this->x])
-                    {
-                        case CELL_EMPTY:
-						case CELL_IN:
-						case CELL_OUT:
-						case CELL_CHARGER:
-							if (warehouse.robots[this->y + 1][this->x] == CELL_EMPTY)
-							{
-								warehouse.robots[this->y + 1][this->x] = this->loaded? CELL_FULL_ROBOT_VER: CELL_EMPT_ROBOT_VER;
-								warehouse.robots[this->y    ][this->x] = CELL_EMPTY;
-								this->y = this->y + 1;
-								
-								if 		(this->state == MOTION)
-									this->battery.charge -= KEEP_MOTION_COST;
-								else if (this->state == STOP)
-									this->battery.charge -= START_MOTION_COST;
-								
-								this->state = MOTION;
-								this->stuck = 0;
-								CurMove[self-1] = 'D';
-							}
-							else //the way is blocked by another robot
-							{
-								++this->stuck;
-								//printf("MOVE_D: incrementing this->stuck...\n");
-							}
-                            break;
-                        case CELL_WALL:
-							this->state = STOP;
-							break;
-                        default:
-                            break;
-                    }
+					Move(this, 'D', self);
                     break;
 				case MOVE_L:
                     ++s->got_msgs_MOVE_L;
-					if (this->time_in_action > 1) //busy
-						break;
-					this->time_in_action = MOVE_TIME;
-					
-					assert(this->cur_ori == HOR);
-					assert(this->x - 1 >= 0);
-                    switch(warehouse.room[this->y][this->x - 1])
-                    {
-                        case CELL_EMPTY:
-						case CELL_IN:
-						case CELL_OUT:
-						case CELL_CHARGER:
-							if (warehouse.robots[this->y][this->x - 1] == CELL_EMPTY)
-							{
-								warehouse.robots[this->y][this->x - 1] = this->loaded? CELL_FULL_ROBOT_HOR: CELL_EMPT_ROBOT_HOR;
-								warehouse.robots[this->y][this->x    ] = CELL_EMPTY;
-								this->x = this->x - 1;
-								
-								if 		(this->state == MOTION)
-									this->battery.charge -= KEEP_MOTION_COST;
-								else if (this->state == STOP)
-									this->battery.charge -= START_MOTION_COST;
-								
-								this->state = MOTION;
-								this->stuck = 0;
-								CurMove[self-1] = 'L';
-							}
-							else //the way is blocked by another robot
-							{
-								++this->stuck;
-								//printf("MOVE_L: incrementing this->stuck...\n");
-							}
-                            break;
-                        case CELL_WALL:
-							this->state = STOP;
-							break;
-                        default:
-                            break;
-                    }
+					Move(this, 'L', self);
                     break;
 				case MOVE_R:
                     ++s->got_msgs_MOVE_R;
-					if (this->time_in_action > 1) //busy
-						break;
-					this->time_in_action = MOVE_TIME;
-					
-					assert(this->cur_ori == HOR);
-					//printf("this->x = %d, warehouse.size_x = %d\n", this->x, warehouse.size_x);
-					assert(this->x + 1 < warehouse.size_x);
-                    switch(warehouse.room[this->y][this->x + 1])
-                    {
-                        case CELL_EMPTY:
-						case CELL_IN:
-						case CELL_OUT:
-						case CELL_CHARGER:
-							if (warehouse.robots[this->y][this->x + 1] == CELL_EMPTY)
-							{
-								warehouse.robots[this->y][this->x + 1] = this->loaded? CELL_FULL_ROBOT_HOR: CELL_EMPT_ROBOT_HOR;
-								warehouse.robots[this->y][this->x]     = CELL_EMPTY;
-								this->x = this->x + 1;
-								
-								if 		(this->state == MOTION)
-									this->battery.charge -= KEEP_MOTION_COST;
-								else if (this->state == STOP)
-									this->battery.charge -= START_MOTION_COST;
-								
-								this->state = MOTION;
-								this->stuck = 0;
-								CurMove[self-1] = 'R';
-							}
-							else //the way is blocked by another robot
-							{
-								++this->stuck;
-								//printf("MOVE_R: incrementing this->stuck...\n");
-							}
-                            break;
-                        case CELL_WALL:
-							this->state = STOP;
-							break;
-                        default:
-                            break;
-                    }
+					Move(this, 'R', self);
                     break;
                 case LOAD:
                     ++s->got_msgs_LOAD;
-					if (this->time_in_action > 1) //busy
-						break;
-					this->time_in_action = LOAD_TIME;
-					
-					if (this->state == MOTION)
-						this->battery.charge -= STOP_MOTION_COST;
-					this->state = STOP;
-					
-                    if (warehouse.room[this->y][this->x] == CELL_IN && this->loaded == false)
-                    {
-                        this->loaded = true;
-						if (this->cur_ori == VER)
-							warehouse.robots[this->y][this->x] = CELL_FULL_ROBOT_VER;
-						else
-							warehouse.robots[this->y][this->x] = CELL_FULL_ROBOT_HOR;
-						
-						AssignDest(&Robots.elem[self-1], CELL_OUT);
-						CurMove[self-1] = 'I';
-						if (this->emergency)
-						{
-							this->emergency = false;
-							EmergencyMapInit(&this->emergency_map);
-						}
-                    }
+					Load(this, self);
                     break;
                 case UNLOAD:
                     ++s->got_msgs_UNLOAD;
-					if (this->time_in_action > 1) //busy
-						break;
-					this->time_in_action = UNLOAD_TIME;
-					
-					if (this->state == MOTION)
-						this->battery.charge -= STOP_MOTION_COST;
-					this->state = STOP;
-					
-                    if (warehouse.room[this->y][this->x] == CELL_OUT && this->loaded == true)
-                    {
-                        this->loaded = false;
-						if (this->cur_ori == VER)
-							warehouse.robots[this->y][this->x] = CELL_EMPT_ROBOT_VER;
-						else
-							warehouse.robots[this->y][this->x] = CELL_EMPT_ROBOT_HOR;
-                        
-						++this->boxes_delivered;
-						
-						//if (Robots.elem[self-1].battery.charge < TIME_TO_CHARGE_THRESHOLD)
-						//	AssignDest(&Robots.elem[self-1], CELL_CHARGER);
-						//else
-							AssignDest(&Robots.elem[self-1], CELL_IN);
-						CurMove[self-1] = 'O';
-						if (this->emergency)
-						{
-							this->emergency = false;
-							EmergencyMapInit(&this->emergency_map);
-						}
-                    }
+					Unload(this, self);
                     break;
 				case INIT:
 					++s->got_msgs_INIT;

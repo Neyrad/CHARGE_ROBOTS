@@ -17,6 +17,7 @@
 
 #define N_INS 3
 #define N_OUTS 9
+#define N_CHARGERS 2
 
 #define BIG_NUMBER 		666
 #define MOVES_STUCK_LIMIT 3
@@ -26,16 +27,15 @@
 #define MAX_ROOM_SIZE_X 10
 #define MAX_COMMENT_LENGTH 1000
 #define MAX_ROBOTS 100
-//#define MAX_INPUT_LENGTH 20000000
 #define MAX_INPUT_LENGTH 7200000
 #define MAX_PATH_TO_LOG_FOLDER 256
 
 /*------------------ENERGY COST DEFINES------------------*/
 #define BATTERY_CAPACITY		152000
-#define START_MOTION_COST		    0//44
-#define KEEP_MOTION_COST		    0// 7
+#define START_MOTION_COST		    44
+#define KEEP_MOTION_COST		     7
 #define STOP_MOTION_COST		     0
-#define ROTATE_COST				    0//16
+#define ROTATE_COST				    16
 #define TIME_TO_CHARGE_THRESHOLD 51200
 #define CHARGE_CHUNK			    64 // charge per time unit
 
@@ -45,7 +45,6 @@
 #define   MOVE_TIME 1		
 #define   LOAD_TIME 2
 #define UNLOAD_TIME 1
-#define STALL_TIME  250
 
 #define MAX_CYCLES_LiFePO4      2000
 #define MAX_CYCLES_LiNiMnCoO2   1500
@@ -58,7 +57,7 @@
 //		1 (m/step) / ROBOT_VELOCITY (m/s) = 0.4 (sec/step)
 // 9000 * 0.4 = 3600
 // => 1 hr of real time is 9000 simulation steps
-#define GLOBAL_TIME_END (365 * 9000 * 24)
+#define GLOBAL_TIME_END (24 * 9000)
 
 FILE* LogFile;
 
@@ -100,19 +99,27 @@ struct _outs
 	struct square elem[N_OUTS];
 };
 
-struct _ins  ins;
-struct _outs outs;
+struct _chargers
+{
+	int size;
+	struct square elem[N_CHARGERS];
+};
+
+struct _ins 	 ins;
+struct _outs 	 outs;
+struct _chargers chargers;
 
 char CurMove[MAX_ROBOTS];
 
-struct map
+struct _map
 {
 	int  elem	[MAX_ROOM_SIZE_Y][MAX_ROOM_SIZE_X];
 	bool covered[MAX_ROOM_SIZE_Y][MAX_ROOM_SIZE_X];
 };
 
-struct map out_maps[N_OUTS];
-struct map  in_maps[N_INS];
+struct _map in_maps[N_INS];
+struct _map out_maps[N_OUTS];
+struct _map charger_maps[N_CHARGERS];
 
 struct point
 {
@@ -133,7 +140,6 @@ struct _warehouse warehouse;
 //IN - OUT pairs
 struct _pairs
 {
-	//int data[MAX_INPUT_LENGTH][2];
 	int** elem;
 	int cur;
 	int length;
@@ -156,6 +162,12 @@ typedef enum
 	LiCoO2     = 3
 } BatteryType;
 
+struct _DegradationModel
+{
+	int elem[MAX_CYCLES_OF_ALL_TYPES];
+	int cur;
+};
+
 struct _battery
 {
 	bool charging;
@@ -166,9 +178,8 @@ struct _battery
 	int charge;
 	int capacity;
 	
-	int BDM[MAX_CYCLES_OF_ALL_TYPES];
-	int BDM_cur;
-	
+	struct _DegradationModel DegradationModel;
+
 	BatteryType type;
 };
 
@@ -195,6 +206,7 @@ struct _robot
 
 	int in_num;
 	int out_num;
+	int charger_num;
 	
 	enum
 	{
@@ -202,7 +214,7 @@ struct _robot
 		MOTION
 	} state;
 	
-	struct map emergency_map;
+	struct _map emergency_map;
 };
 
 struct _robots
@@ -274,7 +286,7 @@ extern void model_event_reverse(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
 extern void model_final(state* s, tw_lp* lp);
 // defined in map.c:
 extern tw_peid model_map(tw_lpid gid);
-extern tw_lpid model_typemap (tw_lpid gid);
+extern tw_lpid model_typemap(tw_lpid gid);
 
 //Global variables used by both main and driver
 // - this defines the LP types
@@ -310,9 +322,9 @@ extern int CalcNextMove(struct _robot* robot);
 extern void PrintPairs();
 
 // Battery Degradation Model curve init
-extern void InitBDM(struct _robot* robot, BatteryType BT);
+extern void InitDegradationModel(struct _robot* robot, BatteryType BT);
 
-extern void PrintBDM(struct _robot* robot, const char* print_to);
+extern void PrintDegradationModel(struct _robot* robot, const char* print_to);
 extern int CalculateCapacity(struct _robot* robot);
 
 extern void SimulateROSS(int argc, char* argv[]);
@@ -323,28 +335,34 @@ extern void Free();
 extern void FinalizeROSS();
 extern void PrintNBoxesDelivered();
 
-extern void FindInsOuts();
+extern void FindInsOutsChargers();
 extern void InitMaps();
-extern void Fill(struct map* map, struct square cur);
+extern void Fill(struct _map* map, struct square cur);
 extern void PrintMapConsole(int  map[MAX_ROOM_SIZE_Y][MAX_ROOM_SIZE_X], int Num);
 extern void PrintCovered   (bool cov[MAX_ROOM_SIZE_Y][MAX_ROOM_SIZE_X], int Num);
 extern void PrintRoom();
 extern bool Valid(struct square A);
-extern int UnstuckMoveSequence(struct _robot* robot);
+//extern int UnstuckMoveSequence(struct _robot* robot);
 extern void PrintMoves();
 extern void PrintMovesInit();
 extern void EmergencyFill(struct _robot* robot, struct square cur);
 extern void EmergencyMapFill(struct _robot* robot);
 extern bool ValidEmpty(struct square A);
 extern bool ValidEmptyExcludingCurRobot(struct _robot* robot, struct square A);
-extern void EmergencyMapInit(struct map* emergency_map);
+extern void EmergencyMapInit(struct _map* emergency_map);
 extern int RandomLegalMove(struct _robot* robot);
-extern bool EverybodyWhoIsStuckFailedToGetOut();
+//extern bool EverybodyWhoIsStuckFailedToGetOut();
 extern void DumpRobots();
 extern bool BlockedFromAllSides(int x, int y);
 extern bool FlowerFormation(struct _robot* robot);
 extern bool isFlower(struct square center);
 extern struct square RandomValidSquare();
 extern bool NoOneInEmergencyMode();
+extern bool AssignEmptyChargerIfPossible(struct _robot* robot);
 
+extern void Rotate(struct _robot* this, int self);
+extern void Move(struct _robot* this, char direction, int self); // 'U', 'D', 'L', 'R'
+extern void Load(struct _robot* this, int self);
+extern void Unload(struct _robot* this, int self);
+extern CELL GetNewCellRobot(struct _robot* this);
 #endif

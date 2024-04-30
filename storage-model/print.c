@@ -44,36 +44,36 @@ void RobotsPrint()
 	fclose(f);
 }
 
-void PrintBDM(struct _robot* robot, const char* print_to)
+void PrintDegradationModel(struct _robot* robot, const char* print_to)
 {
 	int MAX_CYCLES = -1;
 	switch(robot->battery.type)
 	{
 		case LiFePO4:
 			MAX_CYCLES = MAX_CYCLES_LiFePO4;
-			printf("PrintBDM(): Battery type LiFePO4\n");
+			printf("PrintDegradationModel(): Battery type LiFePO4\n");
 			break;
 		case LiNiMnCoO2:
 			MAX_CYCLES = MAX_CYCLES_LiNiMnCoO2;
-			printf("PrintBDM(): Battery type LiNiMnCoO2\n");
+			printf("PrintDegradationModel(): Battery type LiNiMnCoO2\n");
 			break;
 		case LeadAcid:
 			MAX_CYCLES = MAX_CYCLES_LeadAcid;
-			printf("PrintBDM(): Battery type LeadAcid\n");
+			printf("PrintDegradationModel(): Battery type LeadAcid\n");
 			break;
 		case LiCoO2:
 			MAX_CYCLES = MAX_CYCLES_LiCoO2;
-			printf("PrintBDM(): Battery type LiCoO2\n");
+			printf("PrintDegradationModel(): Battery type LiCoO2\n");
 			break;
 		default:
-			printf("PrintBDM(): Unknown battery type [%d]\n", robot->battery.type);
+			printf("PrintDegradationModel(): Unknown battery type [%d]\n", robot->battery.type);
 			return;
 	}
 	
 	if (print_to == "console" || print_to == "Console" || print_to == "CONSOLE")
 	{
 		for (int i = 0; i < MAX_CYCLES; ++i)
-			printf("robot->battery.BDM[%d] = %d\n", i, robot->battery.BDM[i]);
+			printf("robot->battery.DegradationModel.elem[%d] = %d\n", i, robot->battery.DegradationModel.elem[i]);
 	}
 	
 	else
@@ -82,7 +82,7 @@ void PrintBDM(struct _robot* robot, const char* print_to)
 		assert(f);
 		
 		for (int i = 0; i < MAX_CYCLES; ++i)
-			fprintf(f, "%d,%f\n", i, (float)robot->battery.BDM[i] / (float)BATTERY_CAPACITY);
+			fprintf(f, "%d,%f\n", i, (float)robot->battery.DegradationModel.elem[i] / (float)BATTERY_CAPACITY);
 		
 		fclose(f);
 	}

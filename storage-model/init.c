@@ -7,8 +7,7 @@ extern const char* path_to_pairs;
 
 void PairsInit(const char* path)
 {
-	printf("PairsInit(): ALIVE, sizeof(int) = %ld\n", sizeof(int));
-	
+	//printf("PairsInit(): ALIVE, sizeof(int) = %ld\n", sizeof(int));
 	
 	pairs.elem = calloc(MAX_INPUT_LENGTH, sizeof(int*));	
 	for (int i = 0; i < MAX_INPUT_LENGTH; ++i)
@@ -19,27 +18,13 @@ void PairsInit(const char* path)
 
     FILE* f = fopen(path, "r");
     assert(f); //to check correctness of the path
-	printf("stats.st_size = %ld, MAX_INPUT_LENGTH * 4 = %d\n", stats.st_size, MAX_INPUT_LENGTH * 4);
+	//printf("stats.st_size = %ld, MAX_INPUT_LENGTH * 4 = %d\n", stats.st_size, MAX_INPUT_LENGTH * 4);
 	assert(stats.st_size <= MAX_INPUT_LENGTH * 4);
 
 
-
-
-
- //   char buf[MAX_INPUT_LENGTH * 4]; 
 	char* buf = calloc(MAX_INPUT_LENGTH * 4, sizeof(char)); //'1' ',' '2' '\n' -> 4 columns (should I consider \r ???)
-
-
     fread(buf, sizeof(buf[0]), stats.st_size, f);
     fclose(f);
-
-
-
-
-
-
-
-
 
 	pairs.length = 0;
     int x = 0;
@@ -63,7 +48,7 @@ void PairsInit(const char* path)
 	
 	free(buf);
 	
-	printf("PairsInit(): ALIVE\n");
+	//printf("PairsInit(): ALIVE\n");
 	//assert(false);
 }
 
@@ -100,48 +85,48 @@ void RobotsInit()
 
 void FilesInit()
 {
-	printf("FilesInit(): ALIVE\n");
+	//printf("FilesInit(): ALIVE\n");
 	
 	Parse(path_to_room_file,   warehouse.room);
 	
-	printf("FilesInit(): ALIVE\n");
+	//printf("FilesInit(): ALIVE\n");
 	
 	Parse(path_to_robots_file, warehouse.robots);
 	
-	printf("FilesInit(): ALIVE\n");
+	//printf("FilesInit(): ALIVE\n");
 	
 	PairsInit(path_to_pairs);
 	
-	printf("FilesInit(): ALIVE\n");
+	//printf("FilesInit(): ALIVE\n");
 	
 	PrintMovesInit();
 	
-	printf("FilesInit(): ALIVE\n");
+	//printf("FilesInit(): ALIVE\n");
 }
 
 void InitROSS()
 {
-	printf("InitROSS(): ALIVE\n");
+	//printf("InitROSS(): ALIVE\n");
 	
 	srand(time(NULL));
 	
-	printf("InitROSS(): ALIVE\n");
+	//printf("InitROSS(): ALIVE\n");
 	
 	FilesInit();
 	
-	printf("InitROSS(): ALIVE\n");
+	//printf("InitROSS(): ALIVE\n");
 	
     RobotsInit();
 	
-	printf("InitROSS(): ALIVE\n");
+	//printf("InitROSS(): ALIVE\n");
 	
-	FindInsOuts();
+	FindInsOutsChargers();
 	
-	printf("InitROSS(): ALIVE\n");
+	//printf("InitROSS(): ALIVE\n");
 	
 	InitMaps();
 	
-	printf("InitROSS(): ALIVE\n");
+	//printf("InitROSS(): ALIVE\n");
 	
 	for (int i = 0; i < ins.size; ++i)
 	{
@@ -153,12 +138,16 @@ void InitROSS()
 		Fill(&out_maps[i], outs.elem[i]);
 		PrintMapConsole(out_maps[i].elem, i);
 	}
-	
-	printf("InitROSS(): ALIVE\n");
+	for (int i = 0; i < chargers.size; ++i)
+	{
+		Fill(&charger_maps[i], chargers.elem[i]);
+		PrintMapConsole(charger_maps[i].elem, i);
+	}
+	//printf("InitROSS(): ALIVE\n");
 	
 	RobotsPrint();
 	
-	printf("InitROSS(): ALIVE\n");
+	//printf("InitROSS(): ALIVE\n");
 }
 
 void PrintMovesInit() // empties the log file beforehand
@@ -193,9 +182,20 @@ void InitMaps()
 			}
 		out_maps[i].elem[outs.elem[i].y][outs.elem[i].x] = 0; // OUT
 	}
+	
+	for (int i = 0; i < N_CHARGERS; ++i)
+	{
+		for (int y = 0; y < MAX_ROOM_SIZE_Y; ++y)
+			for (int x = 0; x < MAX_ROOM_SIZE_X; ++x)
+			{
+				charger_maps[i].elem   [y][x] = BIG_NUMBER;
+				charger_maps[i].covered[y][x] = false;
+			}
+		charger_maps[i].elem[chargers.elem[i].y][chargers.elem[i].x] = 0; // CHARGER
+	}
 }
 
-void EmergencyMapInit(struct map* emergency_map)
+void EmergencyMapInit(struct _map* emergency_map)
 {
 	for (int y = 0; y < MAX_ROOM_SIZE_Y; ++y)
 		for (int x = 0; x < MAX_ROOM_SIZE_X; ++x)
@@ -205,7 +205,7 @@ void EmergencyMapInit(struct map* emergency_map)
 		}
 }
 
-void FindInsOuts()
+void FindInsOutsChargers()
 {
 	ins.size = 0;
 	for (int y = 0; y < warehouse.size_y; ++y)
@@ -225,6 +225,16 @@ void FindInsOuts()
 				struct square tmp = {x, y};
 				outs.elem[outs.size] = tmp;
 				++outs.size;
+			}
+			
+	chargers.size = 0;
+	for (int y = 0; y < warehouse.size_y; ++y)
+		for (int x = 0; x < warehouse.size_x; ++x)
+			if (warehouse.room[y][x] == CELL_CHARGER)
+			{
+				struct square tmp = {x, y};
+				chargers.elem[chargers.size] = tmp;
+				++chargers.size;
 			}
 }
 

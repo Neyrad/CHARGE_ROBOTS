@@ -72,3 +72,22 @@ struct square RandomValidSquare()
 	struct square error = {-1, -1};
 	return error;
 }
+
+CELL GetNewCellRobot(struct _robot* this)
+{
+	if (this->loaded)
+	{
+		if (this->cur_ori == VER)
+			return CELL_FULL_ROBOT_VER;
+		else
+			return CELL_FULL_ROBOT_HOR;
+	}
+	
+	else
+	{
+		if (this->cur_ori == VER)
+			return CELL_EMPT_ROBOT_VER;
+		else
+			return CELL_EMPT_ROBOT_HOR;
+	}
+}
