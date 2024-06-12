@@ -27,6 +27,10 @@ SET(model_srcs
 	print.c
 	routing.c
 	commands.c
+	API.c
+	pathfinder.c
+	reservation.c
+	robotqueue.c
 	model.h
 	model_config.h
 )

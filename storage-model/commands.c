@@ -2,6 +2,8 @@
 
 void Rotate(struct _robot* this, int self)
 {
+	assert(false);
+	
 	if (this->time_in_action > 1) //busy
 		return;
 	this->time_in_action = ROTATE_TIME;
@@ -13,12 +15,12 @@ void Rotate(struct _robot* this, int self)
 	if (this->cur_ori == VER)
 	{
 		this->cur_ori = HOR;
-		warehouse.robots[this->y][this->x] = this->loaded? CELL_FULL_ROBOT_HOR: CELL_EMPT_ROBOT_HOR;
+		warehouse.robots_next_step[this->y][this->x] = this->loaded? CELL_FULL_ROBOT_HOR: CELL_EMPT_ROBOT_HOR;
 	}
 	else
 	{
 		this->cur_ori = VER;
-		warehouse.robots[this->y][this->x] = this->loaded? CELL_FULL_ROBOT_VER: CELL_EMPT_ROBOT_VER;
+		warehouse.robots_next_step[this->y][this->x] = this->loaded? CELL_FULL_ROBOT_VER: CELL_EMPT_ROBOT_VER;
 	}
 					
 	CurMove[self-1] = 'F';
@@ -33,26 +35,26 @@ void Move(struct _robot* this, char direction, int self) // 'U', 'D', 'L', 'R'
 	
 	int move_x = 0;
 	int move_y = 0;
-	direction = toupper(direction);			
+	direction = toupper(direction);
 	switch(direction)
 	{
 		case 'U':
-			assert(this->cur_ori == VER);
+			//assert(this->cur_ori == VER);
 			move_x =  0;
 			move_y = -1;
 			break;
 		case 'D':
-			assert(this->cur_ori == VER);
+			//assert(this->cur_ori == VER);
 			move_x =  0;
 			move_y = +1;
 			break;
 		case 'L':
-			assert(this->cur_ori == HOR);
+			//assert(this->cur_ori == HOR);
 			move_x = -1;
 			move_y =  0;
 			break;
 		case 'R':
-			assert(this->cur_ori == HOR);
+			//assert(this->cur_ori == HOR);
 			move_x = +1;
 			move_y =  0;
 			break;
@@ -62,7 +64,14 @@ void Move(struct _robot* this, char direction, int self) // 'U', 'D', 'L', 'R'
 			break;
 	}
 
-	struct square destination = {this->x + move_x, this->y + move_y};
+	square destination = {this->x + move_x, this->y + move_y};
+	if (!Valid(destination))
+	{
+		//printf("destination = (%d, %d)\n", destination.x, destination.y);
+		//printf("this->boxes_delivered = %d\n", this->boxes_delivered);
+		//displayReservationTable();
+		//displayRobotCommands(this);
+	}
 	assert(Valid(destination));
 			
     switch(warehouse.room[destination.y][destination.x])
@@ -71,10 +80,9 @@ void Move(struct _robot* this, char direction, int self) // 'U', 'D', 'L', 'R'
 		case CELL_IN:
 		case CELL_OUT:
 		case CELL_CHARGER:
-			if (warehouse.robots[destination.y][destination.x] == CELL_EMPTY)
+			if (warehouse.robots_next_step[destination.y][destination.x] == CELL_EMPTY)
 			{
-				warehouse.robots[destination.y][destination.x] = GetNewCellRobot(this);
-				warehouse.robots[this->y][this->x] = CELL_EMPTY;
+				warehouse.robots_next_step[destination.y][destination.x] = GetNewCellRobot(this);
 				this->x = destination.x;
 				this->y = destination.y;
 								
@@ -84,17 +92,27 @@ void Move(struct _robot* this, char direction, int self) // 'U', 'D', 'L', 'R'
 					this->battery.charge -= START_MOTION_COST;
 																
 				this->state = MOTION;
-				this->stuck = 0;
 				CurMove[self-1] = direction;
 			}
 			else //the way is blocked by another robot
 			{
-				++this->stuck;
-				//printf("MOVE: incrementing this->stuck...\n");
+				printf("ROBOT #%d can't go through\n", this->num_in_array + 1);
+				
+				printf("warehouse.robots_next_step[destination.y][destination.x] == %d\n", warehouse.robots_next_step[destination.y][destination.x]);
+				printf("destination = (%d, %d)\n", destination.x, destination.y);
+				PrintRoomAndRobots();
+				
+				displayReservationTableAlt();
+				
+				for (int i = 0; i < Robots.N; ++i)
+					printf("Robots.elem[%d].time_layer = <%d>\n", i, Robots.elem[i].time_layer);
+				
+				assert(false);
 			}
 			break;
         case CELL_WALL:
 			this->state = STOP;
+			assert(false);
 			break;
         default:
             break;
@@ -115,18 +133,13 @@ void Load(struct _robot* this, int self)
     {
         this->loaded = true;
 		if (this->cur_ori == VER)
-			warehouse.robots[this->y][this->x] = CELL_FULL_ROBOT_VER;
+			warehouse.robots_next_step[this->y][this->x] = CELL_FULL_ROBOT_VER;
 		else
-			warehouse.robots[this->y][this->x] = CELL_FULL_ROBOT_HOR;
+			warehouse.robots_next_step[this->y][this->x] = CELL_FULL_ROBOT_HOR;
 						
 		AssignDest(this, CELL_OUT);
 		
 		CurMove[self-1] = 'I';
-		if (this->emergency)
-		{
-			this->emergency = false;
-			EmergencyMapInit(&this->emergency_map); // WHY?
-		}
     }
 }
 
@@ -144,9 +157,9 @@ void Unload(struct _robot* this, int self)
     {
         this->loaded = false;
 		if (this->cur_ori == VER)
-			warehouse.robots[this->y][this->x] = CELL_EMPT_ROBOT_VER;
+			warehouse.robots_next_step[this->y][this->x] = CELL_EMPT_ROBOT_VER;
 		else
-			warehouse.robots[this->y][this->x] = CELL_EMPT_ROBOT_HOR;
+			warehouse.robots_next_step[this->y][this->x] = CELL_EMPT_ROBOT_HOR;
                         
 		++this->boxes_delivered;
 						
@@ -156,10 +169,5 @@ void Unload(struct _robot* this, int self)
 			AssignDest(this, CELL_IN);
 		
 		CurMove[self-1] = 'O';
-		if (this->emergency)
-		{
-			this->emergency = false;
-			EmergencyMapInit(&this->emergency_map); // WHY?
-		}
     }	
 }

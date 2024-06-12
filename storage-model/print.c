@@ -127,16 +127,23 @@ void DumpRobots()
 	{
 		printf("Robots.elem[%d].x                 = %d\n", i, Robots.elem[i].x);
 		printf("Robots.elem[%d].y                 = %d\n", i, Robots.elem[i].y);
-		printf("Robots.elem[%d].stuck             = %d\n", i, Robots.elem[i].stuck);
-		printf("Robots.elem[%d].emergency         = %d\n", i, Robots.elem[i].emergency);
-		printf("Robots.elem[%d].escape_flower     = %d\n", i, Robots.elem[i].escape_flower);
-		printf("Robots.elem[%d].flower_goal       = (%d, %d)\n", i, Robots.elem[i].flower_goal.x, Robots.elem[i].flower_goal.y);
 		printf("Robots.elem[%d].loaded            = %d\n", i, Robots.elem[i].loaded);
 		printf("Robots.elem[%d].in_num            = %d\n", i, Robots.elem[i].in_num);
 		printf("Robots.elem[%d].out_num           = %d\n", i, Robots.elem[i].out_num);
 		printf("Robots.elem[%d].cur_ori           = %d\n", i, Robots.elem[i].cur_ori);
-		PrintMapConsole(Robots.elem[i].emergency_map.elem, i);
-		//PrintMapConsole(Robots.elem[i].emergency_map.covered, i);
 		printf("\n\n\n");
+	}
+}
+
+void PrintRoomAndRobots()
+{
+	for (int y = 0; y < warehouse.size_y; ++y)
+	{
+		for (int x = 0; x < warehouse.size_x; ++x)
+			printf("%d ", warehouse.robots[y][x]? warehouse.robots[y][x]: 0);//warehouse.room[y][x]);
+		printf("      ");
+		for (int x = 0; x < warehouse.size_x; ++x)
+			printf("%d ", warehouse.robots_next_step[y][x]? warehouse.robots_next_step[y][x]: 0);//warehouse.room[y][x]);
+		printf("\n");
 	}
 }

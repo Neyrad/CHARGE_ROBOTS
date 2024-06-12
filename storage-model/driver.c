@@ -79,17 +79,19 @@ void model_init(state* s, tw_lp* lp)
 		this->battery.times_recharged 	  = 0;
 		this->battery.time_spent_charging = 0;
 		this->boxes_delivered 			  = 0;
-		this->stuck 					  = 0;
 		
 		this->in_num					  = 0;
 		this->out_num					  = 0;
 		this->charger_num				  = 0;
 		
-		this->emergency				      = false;
-		this->escape_flower				  = false;
-		struct square tmp = {-1, -1};
-		this->flower_goal				  = tmp;
-		EmergencyMapInit(&this->emergency_map);
+		this->time_layer				  = 0;
+		
+		square tmp = {-1, -1};
+		square pos; pos.x = this->x; pos.y = this->y;
+		this->commands_end 				  = pos;
+		this->destination 				  = tmp;
+		this->num_in_array 				  = self - 1;
+		RQ_Init(this);
 		AssignDest(this, CELL_IN);
         printf("ROBOT #%d is initialized\n", self);
     }
@@ -101,6 +103,7 @@ void model_init(state* s, tw_lp* lp)
 	s->got_msgs_MOVE_R   = 0;
     s->got_msgs_LOAD	 = 0;
     s->got_msgs_UNLOAD 	 = 0;
+	s->got_msgs_CHARGE 	 = 0;
     s->got_msgs_RECEIVED = 0;
     s->got_msgs_INIT     = 0;
 	s->got_msgs_NOP      = 0;
@@ -154,19 +157,34 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
 			RobotResponded[in_msg->sender-1] = true;
 			if (EveryoneResponded(RobotResponded, Robots.N))
 			{
-				//if (glb_time % 9000 == 0) // every hour
-				//	PrintNBoxesDelivered();
+				if (glb_time % 1000 == 0)
+					printf("Simulating: %d / %d\n", glb_time, GLOBAL_TIME_END);
 				
 				PrintMoves();
 				glb_time += 1;
 				
-				for (int i = 0; i < Robots.N; ++i)
-					RobotResponded[i] = false;
+				displayReservationTableAlt();
+				RT_deQueue();
+				RT_enQueue(ReservationTable.map);
 				
+				for (int i = 0; i < Robots.N; ++i)
+				{
+					RobotResponded[i] = false;
+					--Robots.elem[i].time_layer; // IS CORRECT NOW
+				}
+				
+				for (int y = 0; y < warehouse.size_y; ++y)
+					for (int x = 0; x < warehouse.size_x; ++x)
+					{
+						warehouse.robots		  [y][x] = warehouse.robots_next_step[y][x];
+						warehouse.robots_next_step[y][x] = CELL_EMPTY;
+					}
 				
 				for (int i = 1; i <= Robots.N; ++i)
 				{
-					message_type cmd = CalcNextMove(&Robots.elem[i-1]);
+					message_type cmd = CalcNextMove(&Robots.elem[i - 1]);
+					//if (cmd == NOP)
+					//	displayReservationTable();
 					SendMessage(i, lp, glb_time, cmd);
 				}
 			}
@@ -275,6 +293,7 @@ void model_final(state* s, tw_lp* lp)
 		printf("                got %8d messages of type MOVE_R\n",         s->got_msgs_MOVE_R);
 		printf("                got %8d messages of type LOAD\n",       s->got_msgs_LOAD);
 		printf("                got %8d messages of type UNLOAD\n",       s->got_msgs_UNLOAD);
+		printf("                got %8d messages of type CHARGE\n",       s->got_msgs_CHARGE);
 		printf("                got %8d messages of type INIT\n",           s->got_msgs_INIT);
 		printf("                got %8d messages of type NOP\n",            s->got_msgs_NOP);
 		*/
