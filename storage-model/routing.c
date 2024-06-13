@@ -31,11 +31,11 @@ void AssignDest(struct _robot* robot, CELL goal_cell)
 	
 	robot->goal_cell = goal_cell;
 	robot->destination = tmp;
-	AStar_GetRoute(robot, NewSquare(robot->x, robot->y), robot->destination, 70 + robot->num_in_array + 1);
-	printf("AssignDest: printing stack and reservation table...\n");
-	printf("ROBOT #%d (%d, %d) stack: ", robot->num_in_array + 1, robot->x, robot->y); displayRobotCommands(robot);
+	AStar_GetRoute(robot, NewSquare(robot->x, robot->y), robot->destination, 70 + robot->num_in_array + 1, 0);
+	//printf("AssignDest: printing stack and reservation table...\n");
+	//printf("ROBOT #%d (%d, %d) stack: ", robot->num_in_array + 1, robot->x, robot->y); displayRobotCommands(robot);
 	displayReservationTableAlt();
-	PrintRoomAndRobots();
+	//PrintRoomAndRobots();
 }
 
 bool AssignEmptyChargerIfPossible(struct _robot* robot)
@@ -104,24 +104,19 @@ int CalcNextMove(struct _robot* robot)
 			robot->commands_end.x = robot->x;
 			robot->commands_end.y = robot->y;
 		}
-		AStar_GetRoute(robot, robot->commands_end, robot->destination, 70 + robot->num_in_array + 1);
-		//printf("CalcNextMove: printing stack and reservation table...\n");
-		//printf("ROBOT #%d (%d, %d) stack: ", robot->num_in_array + 1, robot->x, robot->y); displayRobotCommands(robot);
+		AStar_GetRoute(robot, robot->commands_end, robot->destination, 70 + robot->num_in_array + 1, 0);
 		displayReservationTableAlt();
-		//PrintRoomAndRobots();
 		assert(!RQ_isEmpty(robot));
 	}
 	
-	//printf("ROBOT #%d (%d, %d) stack: ", robot->num_in_array + 1, robot->x, robot->y); displayRobotCommands(robot);
-	//PrintRoomAndRobots();
 	return RQ_deQueue(robot);
 }
 
-void Fill(struct _map* map, square cur)
+void Fill(struct _map* map, square cur, bool firstLaunch)
 {	
 	int level = map->elem[cur.y][cur.x];
 	
-	if (!ValidAlt(cur) && level != 0)
+	if (!ValidAlt(cur) && !firstLaunch)
 		return;
 	
 	if (map->covered[cur.y][cur.x])
@@ -159,10 +154,10 @@ void Fill(struct _map* map, square cur)
 	
 	map->covered[cur.y][cur.x] = true;
 	
-	Fill(map, left);
-	Fill(map, right);
-	Fill(map, up);
-	Fill(map, down);
+	Fill(map, left,  false);
+	Fill(map, right, false);
+	Fill(map, up,    false);
+	Fill(map, down,  false);
 }
 
 void GetPair(struct _robot* robot)

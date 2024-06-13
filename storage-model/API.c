@@ -26,10 +26,20 @@ float CostOfGoal(int X1, int Y1, int X2, int Y2)
 	return DistanceBetween(X1, Y1, X2, Y2);
 }
 
-void AStar_GetRoute(struct _robot* robot, square Start, square End, int AgentNumber)
+int EmptySpaceLayer(int X, int Y, int T)
+{	
+	for (int CurrentLayer = T; CurrentLayer < SIZE - 1; ++CurrentLayer)
+		if (!isReserved(X, Y, CurrentLayer) && !isReserved(X, Y, CurrentLayer + 1))
+			return CurrentLayer;
+	return SIZE - 2;
+}
+
+void AStar_GetRoute(struct _robot* robot, square Start, square End, int AgentNumber, int waitUntil)
 {
 	int StartX = Start.x;
 	int StartY = Start.y;
+	int StartT = robot->time_layer;
+	
 	int EndX   = End.x;
 	int EndY   = End.y;
 	
@@ -37,7 +47,7 @@ void AStar_GetRoute(struct _robot* robot, square Start, square End, int AgentNum
 	//printf("ROBOT #%d (%d, %d) stack: ", robot->num_in_array + 1, robot->x, robot->y); displayRobotCommands(robot);
 	//printf("robot->commands_end = (%d, %d)\n", robot->commands_end.X, robot->commands_end.Y);
 	
-	if (StartX == EndX && StartY == EndY)
+	if (StartX == EndX && StartY == EndY && waitUntil == 0)
 		return;
 	
 	int NextInSolutionPos;
@@ -52,8 +62,8 @@ void AStar_GetRoute(struct _robot* robot, square Start, square End, int AgentNum
 				dataMap[y][x][t].CameFrom = NULL;
 			}
 
-	int StartT = robot->time_layer;
-	AStar_Node* Solution = AStar_Find(robot, StartX, StartY, StartT, EndX, EndY, dataMap);
+	
+	AStar_Node* Solution = AStar_Find(robot, StartX, StartY, StartT, EndX, EndY, dataMap, waitUntil);
   
 	if (!Solution)
 	{
@@ -81,10 +91,6 @@ void AStar_GetRoute(struct _robot* robot, square Start, square End, int AgentNum
 		do
 		{
 #if __DEBUG_PRINT
-			//printf("(%d, %d, %d) --> (%d, %d, %d)\n", NextInSolution->X, NextInSolution->Y, NextInSolution->T, \
-						dataMap[NextInSolution->Y][NextInSolution->X][NextInSolution->T].CameFrom->X, \
-						dataMap[NextInSolution->Y][NextInSolution->X][NextInSolution->T].CameFrom->Y, \
-						dataMap[NextInSolution->Y][NextInSolution->X][NextInSolution->T].CameFrom->T);
 			printf("(%d, %d, %d)\n", NextInSolution->X, NextInSolution->Y, NextInSolution->T);
 #endif
 			NextInSolution->NextInSolvedPath = SolutionNavigator;
@@ -96,7 +102,6 @@ void AStar_GetRoute(struct _robot* robot, square Start, square End, int AgentNum
   
 	if (SolutionNavigator) // reserve current cell
 	{
-		//printf("\n\n\nCalling Reserve(x=%d, y=%d, t=%d, agent=%d);\n\n\n", SolutionNavigator->X, SolutionNavigator->Y, SolutionNavigator->T, AgentNumber);
 		Reserve(SolutionNavigator->X, SolutionNavigator->Y, SolutionNavigator->T, AgentNumber);
 	}
   
@@ -118,13 +123,11 @@ void AStar_GetRoute(struct _robot* robot, square Start, square End, int AgentNum
 		else
 			tmp = movX > 0? MOVE_R: MOVE_L;
 
-		//printf("tmp = [%d]\n", tmp);
 		assert(tmp);
 		
 		if (SolutionNavigator->NextInSolvedPath)
-		{	
+		{		
 			RQ_enQueue(robot, tmp);
-			//printf("\n\n\nCalling Reserve(x=%d, y=%d, t=%d, agent=%d);\n\n\n", SolutionNavigator->X + movX, SolutionNavigator->Y + movY, SolutionNavigator->T + 1, AgentNumber);
 			Reserve(SolutionNavigator->X + movX, SolutionNavigator->Y + movY, SolutionNavigator->T + 1, AgentNumber);
 		}
 
@@ -136,37 +139,41 @@ void AStar_GetRoute(struct _robot* robot, square Start, square End, int AgentNum
 		
 			if (SolutionNavigator->X == robot->destination.x && SolutionNavigator->Y == robot->destination.y)
 			{
-				switch (robot->goal_cell)
+				if (!isReserved(robot->destination.x, robot->destination.y, SolutionNavigator->T + 1))
 				{
-					case CELL_IN:
-						RQ_enQueue(robot, LOAD);//robot->cur_ori == robot->dest_ori? LOAD: ROTATE;
-						break;				
-					case CELL_OUT:
-						RQ_enQueue(robot, UNLOAD);//robot->cur_ori == robot->dest_ori? UNLOAD: ROTATE;
-						break;				
-					case CELL_CHARGER:
-						RQ_enQueue(robot, CHARGE);
-						break;
-				}
+					switch (robot->goal_cell)
+					{
+						case CELL_IN:
+							RQ_enQueue(robot, LOAD);//robot->cur_ori == robot->dest_ori? LOAD: ROTATE;
+							break;				
+						case CELL_OUT:
+							RQ_enQueue(robot, UNLOAD);//robot->cur_ori == robot->dest_ori? UNLOAD: ROTATE;
+							break;				
+						case CELL_CHARGER:
+							RQ_enQueue(robot, CHARGE);
+							break;
+					}
 				
-				//printf("\n\n\nCalling Reserve(x=%d, y=%d, t=%d, agent=%d);\n\n\n", SolutionNavigator->X, SolutionNavigator->Y, SolutionNavigator->T + 1, AgentNumber);
-				Reserve(SolutionNavigator->X, SolutionNavigator->Y, SolutionNavigator->T + 1, AgentNumber);
-				robot->time_layer	  = SolutionNavigator->T + 1;		
+					Reserve(SolutionNavigator->X, SolutionNavigator->Y, SolutionNavigator->T + 1, AgentNumber);
+					robot->time_layer	  = SolutionNavigator->T + 1;
+				}
+				else
+				{
+					AStar_GetRoute(robot, End, End, AgentNumber, EmptySpaceLayer(SolutionNavigator->X, SolutionNavigator->Y, SolutionNavigator->T + 1));
+				}
 			}
 		}
 
 		SolutionNavigator = SolutionNavigator->NextInSolvedPath;
 		
-		//printf("API: printing stack and reservation table...\n");
-		//printf("ROBOT #%d (%d, %d) stack: ", robot->num_in_array + 1, robot->x, robot->y); displayRobotCommands(robot);
-		if (robot->num_in_array == 0)
-			printf("ROBOT #%d timelayer = %d\n", robot->num_in_array + 1, robot->time_layer);
+		//if (robot->num_in_array == 0)
+		//	printf("ROBOT #%d timelayer = %d\n", robot->num_in_array + 1, robot->time_layer);
 		displayReservationTableAlt();
 	}
 	
 	map_to_display[StartY][StartX] = '1';
 	map_to_display[EndY  ][EndX  ] = '2';
-  
+  /*
 	for (int y = 0; y < MAX_ROOM_SIZE_Y; ++y)
 	{
 		for (int x = 0; x < MAX_ROOM_SIZE_X; ++x)
@@ -192,6 +199,6 @@ void AStar_GetRoute(struct _robot* robot, square Start, square End, int AgentNum
 		}	
 		printf("\n");
 	}
-	
+	*/
 	RemoveAllFromNodeList(&AllNodesGSet, true);
 }

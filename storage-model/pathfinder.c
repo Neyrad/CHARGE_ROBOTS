@@ -105,7 +105,7 @@ void RemoveAllFromNodeList(AStarNode_List** List, bool FreeNodes)
 	*List = NULL;
 }
 
-AStar_Node* AStar_Find(struct _robot* robot, int StartX, int StartY, int StartT, int EndX, int EndY, NodeDataMap dataMap[MAX_ROOM_SIZE_Y][MAX_ROOM_SIZE_X][SIZE])
+AStar_Node* AStar_Find(struct _robot* robot, int StartX, int StartY, int StartT, int EndX, int EndY, NodeDataMap dataMap[MAX_ROOM_SIZE_Y][MAX_ROOM_SIZE_X][SIZE], int waitUntil)
 {
 	struct _map* Heuristic = robot->goal_cell == CELL_IN?      &in_maps[robot->in_num]:   \
 							 robot->goal_cell == CELL_OUT?     &out_maps[robot->out_num]: \
@@ -168,7 +168,7 @@ AStar_Node* AStar_Find(struct _robot* robot, int StartX, int StartY, int StartT,
 		printf("Current: %d, %d, %d\n", Current->X, Current->Y, Current->T);
 #endif
 	
-		if (Current->X == EndX && Current->Y == EndY || Current->T >= SIZE - 2) // leaving space for LOAD/UNLOAD/CHARGE
+		if (Current->X == EndX && Current->Y == EndY && Current->T >= waitUntil || Current->T >= SIZE - 2) // leaving space for LOAD/UNLOAD/CHARGE
 		{
 			robot->commands_end.x = Current->X;
 			robot->commands_end.y = Current->Y;
@@ -322,11 +322,12 @@ float GetGScore(AStar_Node* Current, AStar_Node* Neighbor) // Anti-deadlock
 bool ValidNeighbor(AStar_Node* TempNodeToFind, int EndX, int EndY)
 {
 	bool in_bounds = TempNodeToFind->X >= 0 && TempNodeToFind->X < warehouse.size_x && TempNodeToFind->Y >= 0 && TempNodeToFind->Y < warehouse.size_y;
-	bool is_end_point = TempNodeToFind->X == EndX && TempNodeToFind->Y == EndY;
+	//bool is_end_point = TempNodeToFind->X == EndX && TempNodeToFind->Y == EndY;
 	bool empty_cell   = CustomGetMap(TempNodeToFind->X, TempNodeToFind->Y, TempNodeToFind->T) == CELL_EMPTY;
 	bool in_cell      = CustomGetMap(TempNodeToFind->X, TempNodeToFind->Y, TempNodeToFind->T) == CELL_IN;
 	bool out_cell     = CustomGetMap(TempNodeToFind->X, TempNodeToFind->Y, TempNodeToFind->T) == CELL_OUT;
 	bool charger_cell = CustomGetMap(TempNodeToFind->X, TempNodeToFind->Y, TempNodeToFind->T) == CELL_CHARGER;
 	
-	return in_bounds && (empty_cell || is_end_point && (in_cell || out_cell || charger_cell));
+	//return in_bounds && (empty_cell || is_end_point && (in_cell || out_cell || charger_cell));
+	return in_bounds && (empty_cell || in_cell || out_cell || charger_cell);
 }

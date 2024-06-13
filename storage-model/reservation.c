@@ -78,9 +78,9 @@ layer CreateLayer(int i)
 
 void RT_enQueue(layer element)
 {
-	printf("GVT = <%d>\n", GVT);
-	for (int i = 0; i < Robots.N; ++i)
-		printf("Robots.elem[%d].time_layer = <%d>\n", i, Robots.elem[i].time_layer);
+	//printf("GVT = <%d>\n", GVT);
+	//for (int i = 0; i < Robots.N; ++i)
+	//	printf("Robots.elem[%d].time_layer = <%d>\n", i, Robots.elem[i].time_layer);
 	
 	++GVT;
 	
@@ -122,7 +122,6 @@ layer RT_deQueue()
 
 void displayReservationTableAlt()
 {
-	//printf("\n");
 	if (RT_isEmpty())
 		printf("Empty Queue\n");
 	else
@@ -130,14 +129,14 @@ void displayReservationTableAlt()
 		// to file
 		int realNum = 0;
 		char path[MAX_PATH_TO_LOG_FOLDER];
-		sprintf(path, "/mnt/c/Dev/Base/3dplot/%d", GVT);
+		sprintf(path, "/mnt/c/Dev/Base/3dplot/sim/%d", GVT);
 		
 		struct stat st = {0};
 		if (stat(path, &st) == -1)
 		{	
-			printf("making new dir...\n");
+			//printf("making new dir...\n");
 			mkdir(path, 0700);
-			printf("done!\n");
+			//printf("done!\n");
 		}
 		
 		for (int i = ReservationTable.front; realNum < SIZE; i = (i + 1) % SIZE)
@@ -145,38 +144,7 @@ void displayReservationTableAlt()
 			PrintLayerToFile(path, ReservationTable.items[i], realNum);
 			realNum++;
 		}
-		//PrintLayerToFile(path, ReservationTable.items[ReservationTable.rear], realNum);
-/*
-		// to console
-		printf("\n\n\n!!!!!!!!!!!!!!!!! GVT = [ %d ] !!!!!!!!!!!!!!!!!!!!!!!\n\n\n", GVT);
-		for (int y = -1; y < warehouse.size_y; ++y)
-		{
-			for (int i = ReservationTable.front; i != (ReservationTable.front + 7) % SIZE; i = (i + 1) % SIZE)	
-			{
-				if (y == -1)
-					printf("Layer T = %d                       ", i);
-				else
-				{
-					printf("[ ");
-					for (int x = 0; x < warehouse.size_x; ++x)
-						printf("%2d ", ReservationTable.items[i].elem[y][x]);
-					printf("]    ");
-				}
-			}
-			if (y == -1)
-				printf("Layer T = %d                       ", ReservationTable.rear);
-			else
-			{
-				printf("[ ");
-				for (int x = 0; x < warehouse.size_x; ++x)
-					printf("%2d ", ReservationTable.items[ReservationTable.rear].elem[y][x]);
-				printf("]    ");
-			}
-			printf("\n");
-		}
-*/
 	}
-	//printf("\n");
 }
 
 void displayReservationTable()
@@ -189,39 +157,21 @@ void displayReservationTable()
 			PrintLayer(ReservationTable.items[i], i);
 		PrintLayer(ReservationTable.items[ReservationTable.rear], ReservationTable.rear);
 	}
-	//printf("\n\n\n");
 }
 
 void Reserve(int X, int Y, int T, int AgentNumber)
 {
-	/*
-	for (int y = 0; y < warehouse.size_y; ++y)
-		for (int x = 0; x < warehouse.size_x; ++x)
-			if (ReservationTable.items[(ReservationTable.front + T) % SIZE].elem[y][x] == AgentNumber)
-			{
-				printf("Trying to reserve for (X, Y, T) = (%d, %d, %d)\n", X, Y, T);
-				printf("ReservationTable.items[%d].elem[%d][%d] = %d\n", (ReservationTable.front + T) % SIZE, y, x, ReservationTable.items[(ReservationTable.front + T) % SIZE].elem[y][x]);
-				assert(AgentNumber-71 >= 0 && AgentNumber-71 < Robots.N);
-				struct _robot* robot = &Robots.elem[AgentNumber-71];
-				printf("robot->commands_end = (%d, %d)\n", robot->commands_end.x, robot->commands_end.y);
-				printf("Reserve: printing stack and reservation table...\n");
-				printf("ROBOT #%d (%d, %d) stack: ", robot->num_in_array + 1, robot->x, robot->y); displayRobotCommands(robot);
-				displayReservationTableAlt();
-				PrintRoomAndRobots();
-				assert(false);
-			}
-	*/
 	assert(X >= 0 && X < warehouse.size_x);
 	assert(Y >= 0 && Y < warehouse.size_y);
 	assert(T >= 0 && T < SIZE);
 	ReservationTable.items[(ReservationTable.front + T) % SIZE].elem[Y][X] = AgentNumber;
 }
-/*
+
 bool isReserved(int X, int Y, int T)
 {
-	assert(T < SIZE);
 	assert(X >= 0 && X < warehouse.size_x);
 	assert(Y >= 0 && Y < warehouse.size_y);
-	return ReservationTable.items[(ReservationTable.front + T) % SIZE].elem[Y][X] == CELL_WALL;
+	assert(T >= 0 && T < SIZE);
+	CELL Cur = ReservationTable.items[(ReservationTable.front + T) % SIZE].elem[Y][X];
+	return Cur != CELL_EMPTY && Cur != CELL_IN && Cur != CELL_OUT && Cur != CELL_CHARGER;
 }
-*/

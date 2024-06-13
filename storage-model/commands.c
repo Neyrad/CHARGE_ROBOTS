@@ -22,7 +22,7 @@ void Rotate(struct _robot* this, int self)
 		this->cur_ori = VER;
 		warehouse.robots_next_step[this->y][this->x] = this->loaded? CELL_FULL_ROBOT_VER: CELL_EMPT_ROBOT_VER;
 	}
-					
+
 	CurMove[self-1] = 'F';
 	this->battery.charge -= ROTATE_COST;
 }

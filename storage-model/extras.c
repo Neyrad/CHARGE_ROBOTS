@@ -56,13 +56,8 @@ void FinalizeROSS()
 	fclose(LogFile);
 }
 
-/*
-void BatteryDeath(struct _robot* robot)
-{
-	warehouse.robots[robot->y][robot->x] = CELL_EMPTY;
-	robot->battery.dead = true;
-}
 
+/*
 
 void PrintNBoxesDelivered()
 {

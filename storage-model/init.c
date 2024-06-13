@@ -18,7 +18,7 @@ void PairsInit(const char* path)
 
     FILE* f = fopen(path, "r");
     assert(f); //to check correctness of the path
-	printf("stats.st_size = %ld, MAX_INPUT_LENGTH * 6 = %d\n", stats.st_size, MAX_INPUT_LENGTH * 6);
+	//printf("stats.st_size = %ld, MAX_INPUT_LENGTH * 6 = %d\n", stats.st_size, MAX_INPUT_LENGTH * 6);
 	assert(stats.st_size <= MAX_INPUT_LENGTH * 6);
 
 
@@ -114,17 +114,17 @@ void InitROSS()
 	
 	for (int i = 0; i < ins.size; ++i)
 	{
-		Fill(&in_maps[i], ins.elem[i]);
+		Fill(&in_maps[i], ins.elem[i], true);
 		PrintMapConsole(in_maps[i].elem, i);
 	}
 	for (int i = 0; i < outs.size; ++i)
 	{
-		Fill(&out_maps[i], outs.elem[i]);
+		Fill(&out_maps[i], outs.elem[i], true);
 		PrintMapConsole(out_maps[i].elem, i);
 	}
 	for (int i = 0; i < chargers.size; ++i)
 	{
-		Fill(&charger_maps[i], chargers.elem[i]);
+		Fill(&charger_maps[i], chargers.elem[i], true);
 		PrintMapConsole(charger_maps[i].elem, i);
 	}
 	

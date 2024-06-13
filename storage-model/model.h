@@ -7,7 +7,7 @@
 #ifndef _model_h
 #define _model_h
 
-#define __DEBUG_PRINT 1
+#define __DEBUG_PRINT 0
 
 #include "ross.h"
 #include <stdio.h>
@@ -392,7 +392,7 @@ extern void PrintNBoxesDelivered();
 
 extern void FindInsOutsChargers();
 extern void InitMaps();
-extern void Fill(struct _map* map, square cur);
+extern void Fill(struct _map* map, square cur, bool firstLaunch);
 extern void PrintMapConsole(int  map[MAX_ROOM_SIZE_Y][MAX_ROOM_SIZE_X], int Num);
 extern void PrintCovered   (bool cov[MAX_ROOM_SIZE_Y][MAX_ROOM_SIZE_X], int Num);
 extern void PrintRoom();
@@ -421,8 +421,8 @@ extern AStar_Node* CreateNode(int X, int Y, int T, AStarNode_List** AllNodesSet)
 extern AStarNode_List* FindInNodeList(AStarNode_List* List, AStar_Node* NodeToFind);
 extern void RemoveFromNodeList(AStarNode_List** List, AStar_Node* NodeToRemove, int* LengthPtr);
 extern void RemoveAllFromNodeList(AStarNode_List** List, bool FreeNodes);
-extern AStar_Node* AStar_Find(struct _robot* robot, int StartX, int StartY, int StartT, int EndX, int EndY, NodeDataMap dataMap[MAX_ROOM_SIZE_Y][MAX_ROOM_SIZE_X][SIZE]);
-extern void AStar_GetRoute(struct _robot* robot, square Start, square End, int AgentNumber);
+extern AStar_Node* AStar_Find(struct _robot* robot, int StartX, int StartY, int StartT, int EndX, int EndY, NodeDataMap dataMap[MAX_ROOM_SIZE_Y][MAX_ROOM_SIZE_X][SIZE], int waitUntil);
+extern void AStar_GetRoute(struct _robot* robot, square Start, square End, int AgentNumber, int waitUntil);
 extern float CostOfGoal(int X1, int Y1, int X2, int Y2);
 extern bool RT_isFull();
 extern bool RT_isEmpty();
@@ -451,4 +451,6 @@ extern float GetGScore(AStar_Node* Current, AStar_Node* Neighbor);
 extern bool isReserved(int X, int Y, int T);
 extern int RQ_Get_N_Elems(struct _robot* robot);
 extern bool ValidNeighbor(AStar_Node* TempNodeToFind, int EndX, int EndY);
+extern bool isReserved(int X, int Y, int T);
+extern int EmptySpaceLayer(int X, int Y, int T);
 #endif

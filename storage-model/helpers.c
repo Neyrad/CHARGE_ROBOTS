@@ -8,22 +8,7 @@ bool EveryoneResponded(int* arr, int N)
 			++cnt;
 	return cnt == N;
 }
-/*
-bool BlockedFromAllSides(int x, int y)
-{
-	square left  = {x - 1, y	  };
-	square right = {x + 1, y	  };
-	square up    = {x	, y - 1};
-	square down  = {x	, y + 1};
-	
-	if (ValidEmpty(left))  return false;
-	if (ValidEmpty(right)) return false;
-	if (ValidEmpty(up))    return false;
-	if (ValidEmpty(down))  return false;
 
-	return true;
-}
-*/
 void ValidateMacros()
 {
 	assert(MAX_CYCLES_LiFePO4    <= MAX_CYCLES_OF_ALL_TYPES);
@@ -41,37 +26,9 @@ bool Valid(square A)
 bool ValidAlt(square A)
 {
 	return A.x >= 0 && A.x < warehouse.size_x && A.y >= 0 && A.y < warehouse.size_y \
-		   && warehouse.room[A.y][A.x] == CELL_EMPTY;
+		   && warehouse.room[A.y][A.x] != CELL_WALL;
 }
 
-/*
-bool ValidEmpty(square A)
-{	
-	return Valid(A) && (warehouse.robots[A.y][A.x] == CELL_EMPTY);
-}
-
-bool ValidEmptyExcludingCurRobot(struct _robot* robot, square A)
-{
-	// considering the square occupied by our robot as an empty square
-	
-	return Valid(A) && A.x == robot->x && A.y == robot->y || ValidEmpty(A);
-}
-
-square RandomValidSquare()
-{
-	int tries = 100;
-	for (int i = 0; i < tries; ++i)
-	{
-		//int rand_x = (rand() % (warehouse.size_x / 3)) + (warehouse.size_x / 3);
-		square random_square = {rand() % warehouse.size_x, rand() % warehouse.size_y};
-		if (Valid(random_square) && !BlockedFromAllSides(random_square.x, random_square.y))
-			return random_square;
-	}
-	printf("RandomValidSquare(): ERROR! Unable to find...\n");
-	square error = {-1, -1};
-	return error;
-}
-*/
 CELL GetNewCellRobot(struct _robot* this)
 {
 	if (this->loaded)
