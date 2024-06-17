@@ -450,7 +450,10 @@ extern void RQ_Init(struct _robot* robot);
 extern float GetGScore(AStar_Node* Current, AStar_Node* Neighbor);
 extern bool isReserved(int X, int Y, int T);
 extern int RQ_Get_N_Elems(struct _robot* robot);
-extern bool ValidNeighbor(AStar_Node* TempNodeToFind, int EndX, int EndY);
+extern bool ValidNeighbor(int X, int Y, int T);
+extern bool InBounds(int X, int Y, int T);
 extern bool isReserved(int X, int Y, int T);
 extern int EmptySpaceLayer(int X, int Y, int T);
+extern bool IsLastFreeCell(int X, int Y, int T);
+extern bool BlockingSomeonesWay(int X, int Y, int T, int AgentNumber);
 #endif

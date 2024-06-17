@@ -157,13 +157,13 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
 			RobotResponded[in_msg->sender-1] = true;
 			if (EveryoneResponded(RobotResponded, Robots.N))
 			{
-				if (glb_time % 1000 == 0)
+				if (glb_time % 50 == 0)
 					printf("Simulating: %d / %d\n", glb_time, GLOBAL_TIME_END);
 				
 				PrintMoves();
 				glb_time += 1;
 				
-				displayReservationTableAlt();
+				//displayReservationTableAlt();
 				RT_deQueue();
 				RT_enQueue(ReservationTable.map);
 				

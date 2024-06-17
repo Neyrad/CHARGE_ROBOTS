@@ -21,10 +21,6 @@ const char* path_to_pairs       = "log.csv";
 	LiCoO2
 */
 
-// TODO: CELL_IN, CELL_OUT, CELL_CHARGER should be ALLOWED to cross in routing, BUT should have a higher G cost than CELL_EMPTY and lower than ANTI-DEADLOCK
-// so GetGScore(robot, CELL_OUT) returns BIG_NUMBER / 2 or something.
-// In such case avoiding CELL_IN, CELL_OUT, CELL_CHARGER while routing would be preffered, but crossing them is still better than a dead-lock.
-
 int main(int argc, char* argv[])
 {
 	InitROSS();

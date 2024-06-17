@@ -94,7 +94,7 @@ void RT_enQueue(layer element)
 		ReservationTable.items[ReservationTable.rear] = element;
 	}
 	
-	displayReservationTableAlt();
+	//displayReservationTableAlt();
 }
 
 layer RT_deQueue()
@@ -122,6 +122,8 @@ layer RT_deQueue()
 
 void displayReservationTableAlt()
 {
+	assert(false);
+	
 	if (RT_isEmpty())
 		printf("Empty Queue\n");
 	else

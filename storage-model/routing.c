@@ -34,7 +34,7 @@ void AssignDest(struct _robot* robot, CELL goal_cell)
 	AStar_GetRoute(robot, NewSquare(robot->x, robot->y), robot->destination, 70 + robot->num_in_array + 1, 0);
 	//printf("AssignDest: printing stack and reservation table...\n");
 	//printf("ROBOT #%d (%d, %d) stack: ", robot->num_in_array + 1, robot->x, robot->y); displayRobotCommands(robot);
-	displayReservationTableAlt();
+	//displayReservationTableAlt();
 	//PrintRoomAndRobots();
 }
 
@@ -105,7 +105,7 @@ int CalcNextMove(struct _robot* robot)
 			robot->commands_end.y = robot->y;
 		}
 		AStar_GetRoute(robot, robot->commands_end, robot->destination, 70 + robot->num_in_array + 1, 0);
-		displayReservationTableAlt();
+		//displayReservationTableAlt();
 		assert(!RQ_isEmpty(robot));
 	}
 	

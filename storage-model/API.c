@@ -68,9 +68,21 @@ void AStar_GetRoute(struct _robot* robot, square Start, square End, int AgentNum
 	if (!Solution)
 	{
 #if __DEBUG_PRINT
-		printf("No solution was found\n");
+		printf("No solution was found [GVT = %d]\n", GVT);
 #endif
+		printf("No solution was found [GVT = %d] for agent [%d]\n", GVT, AgentNumber);
 		assert(false);
+/*
+		if (StartX == EndX && StartY == EndY)
+		{
+			printf("No solution was found [GVT = %d]\n", GVT);
+			assert(false);
+		}
+		else
+		{
+			AStar_GetRoute(robot, Start, Start, AgentNumber, SIZE - 2);
+		}
+*/
 	}
 	
 	int map_to_display[MAX_ROOM_SIZE_Y][MAX_ROOM_SIZE_X];
@@ -168,7 +180,7 @@ void AStar_GetRoute(struct _robot* robot, square Start, square End, int AgentNum
 		
 		//if (robot->num_in_array == 0)
 		//	printf("ROBOT #%d timelayer = %d\n", robot->num_in_array + 1, robot->time_layer);
-		displayReservationTableAlt();
+		//displayReservationTableAlt();
 	}
 	
 	map_to_display[StartY][StartX] = '1';

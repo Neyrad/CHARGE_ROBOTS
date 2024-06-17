@@ -219,7 +219,7 @@ AStar_Node* AStar_Find(struct _robot* robot, int StartX, int StartY, int StartT,
 						break;
 				}
         
-				if (ValidNeighbor(&TempNodeToFind, EndX, EndY))
+				if (ValidNeighbor(TempNodeToFind.X, TempNodeToFind.Y, TempNodeToFind.T))
 				{
 					TempNeighborNode = FindInNodeList(AllNodesGSet, &TempNodeToFind);
 					if (TempNeighborNode)
@@ -302,10 +302,35 @@ AStar_Node* AStar_Find(struct _robot* robot, int StartX, int StartY, int StartT,
 	return AStar_SolvedPath;
 }
 
+bool IsLastFreeCell(int X, int Y, int T)
+{
+	int freeCells = 0;
+	if (ValidNeighbor(X  , Y  , T+1))
+		++freeCells;
+	if (ValidNeighbor(X+1, Y  , T+1))
+		++freeCells;
+	if (ValidNeighbor(X-1, Y  , T+1))
+		++freeCells;
+	if (ValidNeighbor(X  , Y+1, T+1))
+		++freeCells;
+	if (ValidNeighbor(X  , Y-1, T+1))
+		++freeCells;
+	assert(freeCells > 0);
+	return freeCells == 1;
+}
+
+bool BlockingSomeonesWay(int X, int Y, int T, int AgentNumber)
+{
+	return InBounds      (X, Y, T) 
+		&& isReserved    (X, Y, T) 
+		&& CustomGetMap  (X, Y, T) != AgentNumber // not our reservation
+		&& IsLastFreeCell(X, Y, T);
+}
+
 float GetGScore(AStar_Node* Current, AStar_Node* Neighbor) // Anti-deadlock
 {
-	CELL aboveCurrent  = ReservationTable.items[(ReservationTable.front + Neighbor->T) % SIZE].elem[Current->Y][Current->X];
-	CELL belowNeighbor = ReservationTable.items[(ReservationTable.front + Current->T)  % SIZE].elem[Neighbor->Y][Neighbor->X];
+	int aboveCurrent  = CustomGetMap(Current->X,  Current->Y,  Neighbor->T);
+	int belowNeighbor = CustomGetMap(Neighbor->X, Neighbor->Y, Current->T);
 	
 	bool aboveCurrentAlreadyReserved  = aboveCurrent != CELL_EMPTY  && aboveCurrent != CELL_IN &&
 									    aboveCurrent != CELL_OUT    && aboveCurrent != CELL_CHARGER;
@@ -316,18 +341,32 @@ float GetGScore(AStar_Node* Current, AStar_Node* Neighbor) // Anti-deadlock
 	if (aboveCurrentAlreadyReserved && belowNeighborAlreadyReserved) // Dead-lock
 		return BIG_NUMBER;
 	else
-		return 1;
+	{
+		int AgentNumber = CustomGetMap(Current->X, Current->Y, Current->T);
+		
+		if (	BlockingSomeonesWay(Neighbor->X,     Neighbor->Y,     Current->T, AgentNumber)
+			||  BlockingSomeonesWay(Neighbor->X + 1, Neighbor->Y,     Current->T, AgentNumber)
+			||  BlockingSomeonesWay(Neighbor->X - 1, Neighbor->Y,     Current->T, AgentNumber)
+			||  BlockingSomeonesWay(Neighbor->X, 	 Neighbor->Y + 1, Current->T, AgentNumber)
+			||  BlockingSomeonesWay(Neighbor->X, 	 Neighbor->Y - 1, Current->T, AgentNumber))
+			return BIG_NUMBER;
+		else
+			return 1;
+	}
 }
 
-bool ValidNeighbor(AStar_Node* TempNodeToFind, int EndX, int EndY)
+bool InBounds(int X, int Y, int T)
 {
-	bool in_bounds = TempNodeToFind->X >= 0 && TempNodeToFind->X < warehouse.size_x && TempNodeToFind->Y >= 0 && TempNodeToFind->Y < warehouse.size_y;
-	//bool is_end_point = TempNodeToFind->X == EndX && TempNodeToFind->Y == EndY;
-	bool empty_cell   = CustomGetMap(TempNodeToFind->X, TempNodeToFind->Y, TempNodeToFind->T) == CELL_EMPTY;
-	bool in_cell      = CustomGetMap(TempNodeToFind->X, TempNodeToFind->Y, TempNodeToFind->T) == CELL_IN;
-	bool out_cell     = CustomGetMap(TempNodeToFind->X, TempNodeToFind->Y, TempNodeToFind->T) == CELL_OUT;
-	bool charger_cell = CustomGetMap(TempNodeToFind->X, TempNodeToFind->Y, TempNodeToFind->T) == CELL_CHARGER;
-	
-	//return in_bounds && (empty_cell || is_end_point && (in_cell || out_cell || charger_cell));
-	return in_bounds && (empty_cell || in_cell || out_cell || charger_cell);
+	return X >= 0 && X < warehouse.size_x
+		&& Y >= 0 && Y < warehouse.size_y
+		&& T >= 0 && T < SIZE;
+}
+
+bool ValidNeighbor(int X, int Y, int T)
+{
+	if (!InBounds(X, Y, T))
+		return false;
+	int Cell = CustomGetMap(X, Y, T);
+	return Cell == CELL_EMPTY || Cell == CELL_IN 
+		|| Cell == CELL_OUT   || Cell == CELL_CHARGER;
 }
