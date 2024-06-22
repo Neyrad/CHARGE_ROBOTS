@@ -371,7 +371,7 @@ bool ValidNeighbor(struct _robot* robot, int X, int Y, int T)
 	bool OurCellCharger = robot->goal_cell == CELL_CHARGER && robot->destination.x == X && robot->destination.y == Y;
 	if (ChargerIsBusy[Y][X] && !OurCellCharger)
 	{
-		printf("\n\n\n\n\n\n\n\n\n(%d, %d) ---> INVALID\n\n\n\n\n\n\n\n\n\n\n\n", X, Y);
+		//printf("\n\n\n\n\n\n\n\n\n(%d, %d) ---> INVALID\n\n\n\n\n\n\n\n\n\n\n\n", X, Y);
 		return false;
 	}
 	

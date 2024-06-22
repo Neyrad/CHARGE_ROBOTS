@@ -4,30 +4,31 @@ void AssignDest(struct _robot* robot, CELL goal_cell)
 {	
 	square tmp;
 	
-	if      (goal_cell == CELL_IN)
+	if (goal_cell == CELL_CHARGER)
+	{
+		if (AssignEmptyChargerIfPossible(robot))
+		{
+			tmp.x = chargers.elem[robot->charger_num].x,
+			tmp.y = chargers.elem[robot->charger_num].y;
+		}
+		else
+			goal_cell = CELL_IN;	// deliver 1 more box, while waiting for a free charger
+		
+		assert(robot->battery.charge > 0);
+	}
+	
+	if (goal_cell == CELL_IN)
 	{
 		GetPair(robot);
 		tmp.x = ins.elem[robot->in_num].x;
 		tmp.y = ins.elem[robot->in_num].y;
 	}
 	
-	else if (goal_cell == CELL_OUT)
+	if (goal_cell == CELL_OUT)
 	{
 		tmp.x = outs.elem[robot->out_num].x;
 		tmp.y = outs.elem[robot->out_num].y;
 	}
-	
-	else if (goal_cell == CELL_CHARGER)
-	{
-		if(!AssignEmptyChargerIfPossible(robot))
-			robot->charger_num = rand() % chargers.size;
-		
-		tmp.x = chargers.elem[robot->charger_num].x,
-		tmp.y = chargers.elem[robot->charger_num].y;
-	}
-	
-	else
-		assert(false);
 	
 	robot->goal_cell   = goal_cell;
 	robot->destination = tmp;
@@ -47,7 +48,7 @@ bool AssignEmptyChargerIfPossible(struct _robot* robot)
 			robot->charger_num = i;
 			return true;
 		}
-	printf("\n\n\n\n\n\n\n\n\n\nALL CHARGERS TAKEN\n\n\n\n\n\n\n\n\n\n");
+	//printf("\n\n\n\n\n\n\n\n\n\nALL CHARGERS TAKEN\n\n\n\n\n\n\n\n\n\n");
 	return false;
 }
 

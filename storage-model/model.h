@@ -7,7 +7,7 @@
 #ifndef _model_h
 #define _model_h
 
-#define __DEBUG_PRINT 1
+#define __DEBUG_PRINT 0
 
 #include "ross.h"
 #include <stdio.h>
@@ -37,7 +37,7 @@
 #define MAX_PATH_TO_LOG_FOLDER 256
 
 /*------------------ENERGY COST DEFINES------------------*/
-#define BATTERY_CAPACITY		52000
+#define BATTERY_CAPACITY		152000
 #define START_MOTION_COST		    44
 #define KEEP_MOTION_COST		     7
 #define STOP_MOTION_COST		     0
@@ -63,7 +63,7 @@
 //		1 (m/step) / ROBOT_VELOCITY (m/s) = 0.4 (sec/step)
 // 9000 * 0.4 = 3600
 // => 1 hr of real time is 9000 simulation steps
-#define GLOBAL_TIME_END (5 * 9000)
+#define GLOBAL_TIME_END (24 * 9000)
 
 FILE* LogFile;
 

@@ -157,7 +157,7 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
 			RobotResponded[in_msg->sender-1] = true;
 			if (EveryoneResponded(RobotResponded, Robots.N))
 			{
-				if (glb_time % 50 == 0)
+				if (glb_time % 10000 == 0)
 					printf("Simulating: %d / %d\n", glb_time, GLOBAL_TIME_END);
 				
 				PrintMoves();
@@ -304,15 +304,15 @@ void model_final(state* s, tw_lp* lp)
 		printf("                battery capacity loss %d%%\n", \
 								(int)( (1 - (float)Robots.elem[self-1].battery.capacity / (float)BATTERY_CAPACITY) * 100 ));
 		
-		printf("                time spent charging   %d days\n", Robots.elem[lp->gid - 1].battery.time_spent_charging / (9000 * 24)); // 1 tick == 0.5 sec
-		printf("                time spent uncharging %d days\n", (glb_time - Robots.elem[lp->gid - 1].battery.time_spent_charging) / (9000 * 24));
+		printf("                time spent charging   %d min\n", Robots.elem[lp->gid - 1].battery.time_spent_charging * 60 / 9000);
+		printf("                time spent uncharging %d min\n", (glb_time - Robots.elem[lp->gid - 1].battery.time_spent_charging) * 60 / 9000);
 		
 		if (Robots.elem[self-1].battery.times_recharged != 0)
 		{
-			printf("                avg work time from 1 charge %d min\n", (glb_time - Robots.elem[lp->gid - 1].battery.time_spent_charging)\
-																		/ Robots.elem[self-1].battery.times_recharged / 150);
-			printf("                avg time on charge          %d min\n", Robots.elem[lp->gid - 1].battery.time_spent_charging \
-																		/ Robots.elem[self-1].battery.times_recharged / 150);
+			printf("                avg work time from 1 charge %d min\n", (glb_time - Robots.elem[lp->gid - 1].battery.time_spent_charging) * 60 / 9000\
+																		/ Robots.elem[self-1].battery.times_recharged);
+			printf("                avg time on charge          %d min\n", Robots.elem[lp->gid - 1].battery.time_spent_charging * 60 / 9000 \
+																		/ Robots.elem[self-1].battery.times_recharged);
 		}
 	}
 }
