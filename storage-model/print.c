@@ -125,12 +125,20 @@ void DumpRobots()
 {
 	for (int i = 0; i < Robots.N; ++i)
 	{
-		printf("Robots.elem[%d].x                 = %d\n", i, Robots.elem[i].x);
-		printf("Robots.elem[%d].y                 = %d\n", i, Robots.elem[i].y);
-		printf("Robots.elem[%d].loaded            = %d\n", i, Robots.elem[i].loaded);
-		printf("Robots.elem[%d].in_num            = %d\n", i, Robots.elem[i].in_num);
-		printf("Robots.elem[%d].out_num           = %d\n", i, Robots.elem[i].out_num);
-		printf("Robots.elem[%d].cur_ori           = %d\n", i, Robots.elem[i].cur_ori);
+		printf("Robots.elem[%d].x                           = %d\n", i, Robots.elem[i].x);
+		printf("Robots.elem[%d].y                           = %d\n", i, Robots.elem[i].y);
+		printf("Robots.elem[%d].destination.x               = %d\n", i, Robots.elem[i].destination.x);
+		printf("Robots.elem[%d].destination.y               = %d\n", i, Robots.elem[i].destination.y);
+		printf("Robots.elem[%d].loaded                      = %d\n", i, Robots.elem[i].loaded);
+		printf("Robots.elem[%d].battery.capacity            = %d\n", i, Robots.elem[i].battery.capacity);
+		printf("Robots.elem[%d].battery.charge              = %d\n", i, Robots.elem[i].battery.charge);
+		printf("Robots.elem[%d].battery.charging            = %d\n", i, Robots.elem[i].battery.charging);
+		printf("Robots.elem[%d].battery.times_recharged     = %d\n", i, Robots.elem[i].battery.times_recharged);
+		printf("Robots.elem[%d].battery.time_spent_charging = %d\n", i, Robots.elem[i].battery.time_spent_charging);
+		printf("Robots.elem[%d].in_num                      = %d\n", i, Robots.elem[i].in_num);
+		printf("Robots.elem[%d].out_num                     = %d\n", i, Robots.elem[i].out_num);
+		printf("Robots.elem[%d].charger_num                 = %d\n", i, Robots.elem[i].charger_num);
+		printf("Robots.elem[%d].cur_ori                     = %d\n", i, Robots.elem[i].cur_ori);
 		printf("\n\n\n");
 	}
 }

@@ -128,6 +128,10 @@ void InitROSS()
 		PrintMapConsole(charger_maps[i].elem, i);
 	}
 	
+	for (int y = 0; y < MAX_ROOM_SIZE_Y; ++y)
+		for (int x = 0; x < MAX_ROOM_SIZE_X; ++x)
+			ChargerIsBusy[y][x] = false;
+	
 	RobotsPrint();
 }
 

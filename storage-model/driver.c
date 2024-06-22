@@ -236,6 +236,7 @@ void model_event(state* s, tw_bf* bf, message* in_msg, tw_lp* lp)
 					break;
                 default:
                     printf("ROBOT #%d: Unhandled forward message of type %d\n", self, in_msg->type);
+					assert(false);
             }
 
             if (in_msg->sender == 0) //the message came from the command center

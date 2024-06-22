@@ -122,7 +122,7 @@ layer RT_deQueue()
 
 void displayReservationTableAlt()
 {
-	assert(false);
+	//assert(false);
 	
 	if (RT_isEmpty())
 		printf("Empty Queue\n");

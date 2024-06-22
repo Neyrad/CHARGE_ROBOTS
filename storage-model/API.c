@@ -71,6 +71,14 @@ void AStar_GetRoute(struct _robot* robot, square Start, square End, int AgentNum
 		printf("No solution was found [GVT = %d]\n", GVT);
 #endif
 		printf("No solution was found [GVT = %d] for agent [%d]\n", GVT, AgentNumber);
+		printf("Start = (%d, %d), End = (%d, %d)\n", StartX, StartY, EndX, EndY);
+		DumpRobots();
+		for (int y = 0; y < warehouse.size_y; ++y)
+		{
+			for (int x = 0; x < warehouse.size_x; ++x)
+				printf("%d ", ChargerIsBusy[y][x]);
+			printf("\n");
+		}
 		assert(false);
 /*
 		if (StartX == EndX && StartY == EndY)
@@ -162,7 +170,7 @@ void AStar_GetRoute(struct _robot* robot, square Start, square End, int AgentNum
 							RQ_enQueue(robot, UNLOAD);//robot->cur_ori == robot->dest_ori? UNLOAD: ROTATE;
 							break;				
 						case CELL_CHARGER:
-							RQ_enQueue(robot, CHARGE);
+							RQ_enQueue(robot, NOP);
 							break;
 					}
 				

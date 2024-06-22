@@ -219,7 +219,7 @@ AStar_Node* AStar_Find(struct _robot* robot, int StartX, int StartY, int StartT,
 						break;
 				}
         
-				if (ValidNeighbor(TempNodeToFind.X, TempNodeToFind.Y, TempNodeToFind.T))
+				if (ValidNeighbor(robot, TempNodeToFind.X, TempNodeToFind.Y, TempNodeToFind.T))
 				{
 					TempNeighborNode = FindInNodeList(AllNodesGSet, &TempNodeToFind);
 					if (TempNeighborNode)
@@ -301,7 +301,7 @@ AStar_Node* AStar_Find(struct _robot* robot, int StartX, int StartY, int StartT,
   
 	return AStar_SolvedPath;
 }
-
+/*
 bool IsLastFreeCell(int X, int Y, int T)
 {
 	int freeCells = 0;
@@ -326,7 +326,7 @@ bool BlockingSomeonesWay(int X, int Y, int T, int AgentNumber)
 		&& CustomGetMap  (X, Y, T) != AgentNumber // not our reservation
 		&& IsLastFreeCell(X, Y, T);
 }
-
+*/
 float GetGScore(AStar_Node* Current, AStar_Node* Neighbor) // Anti-deadlock
 {
 	int aboveCurrent  = CustomGetMap(Current->X,  Current->Y,  Neighbor->T);
@@ -343,14 +343,14 @@ float GetGScore(AStar_Node* Current, AStar_Node* Neighbor) // Anti-deadlock
 	else
 	{
 		int AgentNumber = CustomGetMap(Current->X, Current->Y, Current->T);
-		
+		/*
 		if (	BlockingSomeonesWay(Neighbor->X,     Neighbor->Y,     Current->T, AgentNumber)
 			||  BlockingSomeonesWay(Neighbor->X + 1, Neighbor->Y,     Current->T, AgentNumber)
 			||  BlockingSomeonesWay(Neighbor->X - 1, Neighbor->Y,     Current->T, AgentNumber)
 			||  BlockingSomeonesWay(Neighbor->X, 	 Neighbor->Y + 1, Current->T, AgentNumber)
 			||  BlockingSomeonesWay(Neighbor->X, 	 Neighbor->Y - 1, Current->T, AgentNumber))
 			return BIG_NUMBER;
-		else
+		else*/
 			return 1;
 	}
 }
@@ -362,10 +362,19 @@ bool InBounds(int X, int Y, int T)
 		&& T >= 0 && T < SIZE;
 }
 
-bool ValidNeighbor(int X, int Y, int T)
+bool ValidNeighbor(struct _robot* robot, int X, int Y, int T)
 {
 	if (!InBounds(X, Y, T))
 		return false;
+	//assert(InBounds(X, Y, T));
+	
+	bool OurCellCharger = robot->goal_cell == CELL_CHARGER && robot->destination.x == X && robot->destination.y == Y;
+	if (ChargerIsBusy[Y][X] && !OurCellCharger)
+	{
+		printf("\n\n\n\n\n\n\n\n\n(%d, %d) ---> INVALID\n\n\n\n\n\n\n\n\n\n\n\n", X, Y);
+		return false;
+	}
+	
 	int Cell = CustomGetMap(X, Y, T);
 	return Cell == CELL_EMPTY || Cell == CELL_IN 
 		|| Cell == CELL_OUT   || Cell == CELL_CHARGER;

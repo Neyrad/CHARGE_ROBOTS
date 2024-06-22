@@ -41,7 +41,7 @@ void SimulateROSS(int argc, char* argv[])
         tw_lp_settype(i, &model_lps[0]);
     tw_run();
     tw_end();
-	printf("\nFinal global time is %d days\n", glb_time / (9000 * 24));
+	printf("\nFinal global time is %d hours\n", glb_time / (9000));
 }
 
 void Free()

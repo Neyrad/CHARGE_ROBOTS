@@ -7,7 +7,7 @@
 #ifndef _model_h
 #define _model_h
 
-#define __DEBUG_PRINT 0
+#define __DEBUG_PRINT 1
 
 #include "ross.h"
 #include <stdio.h>
@@ -37,13 +37,13 @@
 #define MAX_PATH_TO_LOG_FOLDER 256
 
 /*------------------ENERGY COST DEFINES------------------*/
-#define BATTERY_CAPACITY		152000
-#define START_MOTION_COST		    0//44
-#define KEEP_MOTION_COST		     0//7
-#define STOP_MOTION_COST		     0//0
-#define ROTATE_COST				    0//16
+#define BATTERY_CAPACITY		52000
+#define START_MOTION_COST		    44
+#define KEEP_MOTION_COST		     7
+#define STOP_MOTION_COST		     0
+#define ROTATE_COST				    16
 #define TIME_TO_CHARGE_THRESHOLD 51200
-#define CHARGE_CHUNK			    0//64 // charge per time unit
+#define CHARGE_CHUNK			    64 // charge per time unit
 
 
 /*-------------------TIME COST DEFINES-------------------*/
@@ -63,7 +63,7 @@
 //		1 (m/step) / ROBOT_VELOCITY (m/s) = 0.4 (sec/step)
 // 9000 * 0.4 = 3600
 // => 1 hr of real time is 9000 simulation steps
-#define GLOBAL_TIME_END (9000)
+#define GLOBAL_TIME_END (5 * 9000)
 
 FILE* LogFile;
 
@@ -114,6 +114,8 @@ struct _chargers
 struct _ins 	 ins;
 struct _outs 	 outs;
 struct _chargers chargers;
+
+bool ChargerIsBusy[MAX_ROOM_SIZE_Y][MAX_ROOM_SIZE_X];
 
 char CurMove[MAX_ROBOTS];
 
@@ -450,7 +452,7 @@ extern void RQ_Init(struct _robot* robot);
 extern float GetGScore(AStar_Node* Current, AStar_Node* Neighbor);
 extern bool isReserved(int X, int Y, int T);
 extern int RQ_Get_N_Elems(struct _robot* robot);
-extern bool ValidNeighbor(int X, int Y, int T);
+extern bool ValidNeighbor(struct _robot* robot, int X, int Y, int T);
 extern bool InBounds(int X, int Y, int T);
 extern bool isReserved(int X, int Y, int T);
 extern int EmptySpaceLayer(int X, int Y, int T);

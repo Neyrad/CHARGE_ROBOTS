@@ -29,7 +29,7 @@ void AssignDest(struct _robot* robot, CELL goal_cell)
 	else
 		assert(false);
 	
-	robot->goal_cell = goal_cell;
+	robot->goal_cell   = goal_cell;
 	robot->destination = tmp;
 	AStar_GetRoute(robot, NewSquare(robot->x, robot->y), robot->destination, 70 + robot->num_in_array + 1, 0);
 	//printf("AssignDest: printing stack and reservation table...\n");
@@ -41,11 +41,13 @@ void AssignDest(struct _robot* robot, CELL goal_cell)
 bool AssignEmptyChargerIfPossible(struct _robot* robot)
 {
 	for (int i = 0; i < chargers.size; ++i)
-		if (warehouse.robots[chargers.elem[i].y][chargers.elem[i].x] == CELL_EMPTY)
+		if (!ChargerIsBusy[chargers.elem[i].y][chargers.elem[i].x])
 		{
+			ChargerIsBusy[chargers.elem[i].y][chargers.elem[i].x] = true;
 			robot->charger_num = i;
 			return true;
 		}
+	printf("\n\n\n\n\n\n\n\n\n\nALL CHARGERS TAKEN\n\n\n\n\n\n\n\n\n\n");
 	return false;
 }
 
@@ -65,37 +67,31 @@ int CalcNextMove(struct _robot* robot)
 			if (robot->battery.charge > robot->battery.capacity)
 				robot->battery.charge = robot->battery.capacity;
 			robot->battery.time_spent_charging += 1;
+			return NOP;
 		}
 		
 		else //fully charged
 		{
-			robot->battery.times_recharged += 1;
-			robot->battery.capacity 		= CalculateCapacity(robot);
-			robot->battery.charge  			= robot->battery.capacity;
-			robot->battery.charging 		= false;
+			robot->battery.times_recharged   += 1;
+			robot->battery.capacity 		  = CalculateCapacity(robot);
+			robot->battery.charge  			  = robot->battery.capacity;
+			robot->battery.charging 		  = false;
+			ChargerIsBusy[robot->y][robot->x] = false;
+			robot->time_layer				  = 0;
 			AssignDest(robot, CELL_IN);
 		}
-		
-		return NOP;
 	}
 
-/*	if (robot->x == robot->destination.x && robot->y == robot->destination.y)
+	if (robot->x == robot->destination.x && robot->y == robot->destination.y)
 	{
-		assert(RQ_isEmpty(robot));
-		switch (robot->goal_cell)
+		//assert(RQ_isEmpty(robot));
+		if (robot->goal_cell == CELL_CHARGER)
 		{
-			case CELL_IN:
-				return LOAD;//robot->cur_ori == robot->dest_ori? LOAD: ROTATE;
-			
-			case CELL_OUT:
-				return UNLOAD;//robot->cur_ori == robot->dest_ori? UNLOAD: ROTATE;
-			
-			case CELL_CHARGER:
-				robot->battery.charging = true;
-				return NOP;
+			robot->battery.charging = true;
+			//return NOP;
 		}
 	}
-*/
+
 	if (robot->commands.n_elems < SIZE / 2 && (robot->commands_end.x != robot->destination.x  || \
 											   robot->commands_end.y != robot->destination.y) || RQ_isEmpty(robot))
 	{
